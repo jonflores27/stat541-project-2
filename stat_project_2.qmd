@@ -43,11 +43,10 @@ final_merged <- readRDS("full_table")
 ### Row
 :::panel-tabset
 
-## Proportion of Plastic Type in most populated Countries
+## Plastic Type Proportions
 
 ```{r}
 #| label: tbl-Data-Summary-1
-#| tbl-cap: "Summary of Each Plastic Type Across All Audits"
 
 plastic_cols <- c("hdpe", "ldpe", "o", "pet", "pp", "ps", "pvc")
 
@@ -94,10 +93,11 @@ map(plastic_cols, function(col) {
 ```
 
 
-## Waste Audit Statistics in most populated counties
+## Audit Statistics
 ```{r}
 #| label: tbl-Data-Summary-2
-#| tbl-cap: "Summary Statistics of Audits for the 10 Countries with the Highest Amount of Plastic Collected"
+
+
 country_profile <- function(data, group_var1, group_var2, min_audits = 10) {
   data |>
     filter(!is.na(country), country != "EMPTY") |>
@@ -151,7 +151,7 @@ country_profile(plastics_clean, country, year, min_audits = 1)
 ### Row
 :::panel-tabset
 
-## Plot
+## Waste per Audit
 ```{r}
 #| label: fig-Vizualization-1
 
@@ -196,7 +196,7 @@ plastics_clean |>
   theme_minimal()
 ```
 
-## Plot 2
+## Plastic Types by Countries
 ```{r}
 #| label: fig-Visualization-2
 
@@ -229,7 +229,7 @@ plastics_clean |>
 ## Col
 ### Row
 :::panel-tabset
-## Table summary 1
+## Environmental Metrics
 ```{r}
 #| label: Table Reserch Question 2
 #| tbl-cap: "Summary of Plastic Compared to Environmental Indicators for the 5 Most Populated Countries"
@@ -237,8 +237,8 @@ plastics_clean |>
 final_merged |>
   group_by(country, year) |>
   summarise(
-    total_plastic = sum(grand_total),
-    avg_plastic = mean(grand_total),
+    total_plastic = sum(total),
+    avg_plastic = mean(total),
     footprint_per_capita = first(EFConsPerCap[!is.na(EFConsPerCap)]),
     biocapacity_per_capita = first(BiocapPerCap[!is.na(BiocapPerCap)]),
     hdi = first(HDI[!is.na(HDI)]),
@@ -276,7 +276,7 @@ final_merged |>
   )
 ```
 
-## Table Summary 2
+## Employment Sectors
 ```{r}
 #| label: Research question 2 table 2
 #| tbl-cap: "Percent of Plastic Types Compared to Largest Indurtry Sectors for the 5 Most Populated Countries"
@@ -338,7 +338,7 @@ final_merged |>
 
 ### Row
 :::panel-tabset
-## ridge plot
+## Waste Type Distribution by GDP
 
 Teams sorted in descending order of total medals.
 
@@ -391,7 +391,7 @@ final_merged |>
 
 ```
 
-## Bubble plot
+## Plastic Type Count by GDP
 
 ```{r}
 #| label: Vizualization 2
