@@ -1,0 +1,599 @@
+---
+title: "Plastic Audits"
+format:
+  dashboard:
+    orientation: columns
+logo: plastics.jpeg
+nav-buttons:
+      - icon: github
+        href: https://github.com/jonflores27/stat541-project-2
+        aria-label: GitHub
+        
+---
+
+```{r}
+#| label: Libraries
+#| message: false
+
+library(tidyverse)
+library(gt)
+library(httr)
+library(stringr)
+library(tidyjson)
+library(jsonlite)
+library(ggridges)
+library(RColorBrewer)
+library(viridis)
+library(ggtext)
+library(broom)
+library(scales)
+library(car)
+
+plastics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2021/2021-01-26/plastics.csv')
+
+plastics_clean <- plastics |> 
+  mutate(across(empty:pvc, ~replace_na(., 0)),
+         total = rowSums(across(c(empty:pvc))),
+         .before = num_events)
+
+final_merged <- readRDS("full_table")
+```
+
+
+
+### Row
+## Col
+:::panel-tabset
+
+## Proportion of Plastic Type in most populated Countries
+
+```{r}
+#| label: tbl-Data-Summary-1
+#| tbl-cap: "Summary of Each Plastic Type Across All Audits"
+
+plastic_cols <- c("hdpe", "ldpe", "o", "pet", "pp", "ps", "pvc")
+
+map(plastic_cols, function(col) {
+  tibble(
+    plastic_type = col,
+    total = sum(plastics[[col]], na.rm = TRUE),
+    mean = mean(plastics[[col]], na.rm = TRUE),
+    median = median(plastics[[col]], na.rm = TRUE),
+    sd = sd(plastics[[col]], na.rm = TRUE),
+    iqr = IQR(plastics[[col]], na.rm = TRUE),
+    min = min(plastics[[col]], na.rm = TRUE),
+    max = max(plastics[[col]], na.rm = TRUE),
+    audits_with_plastic_type = sum(plastics[[col]] > 0, na.rm = TRUE),
+    percent_of_audits = mean(plastics[[col]] > 0, na.rm = TRUE)
+  )
+}) |>
+  list_rbind() |>
+  gt() |>
+  fmt_percent(columns = percent_of_audits, decimals = 2) |>
+  fmt_number(columns = mean:sd, decimals = 2) |>
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels()
+  ) |>
+  tab_header("Summary statistics for each plastic type across all audits") |>
+  cols_label(
+    plastic_type = "Plastic Type",
+    total = "Total",
+    mean = "Mean",
+    median = "Median",
+    sd = "SD",
+    iqr = "IQR",
+    min = "Min",
+    max = "Max",
+    audits_with_plastic_type = "Audits With Plastic Type",
+    percent_of_audits = "Percent of Audits"
+  ) |>
+  data_color(
+    method = "numeric",
+    palette = "PuBu", 
+    reverse = FALSE
+  )
+```
+
+
+## Waste Audit Statistics in most populated counties
+```{r}
+#| label: tbl-Data-Summary-2
+#| tbl-cap: "Summary Statistics of Audits for the 10 Countries with the Highest Amount of Plastic Collected"
+country_profile <- function(data, group_var1, group_var2, min_audits = 10) {
+  data |>
+    filter(!is.na(country), country != "EMPTY") |>
+    group_by({{ group_var1 }}, {{ group_var2 }}) |>
+    summarise(
+      audits = n(),
+      total_pieces = sum(grand_total),
+      median_pieces = median(grand_total),
+      mean_pieces = mean(grand_total),
+      max_pieces = max(grand_total),
+      .groups = "drop"
+    ) |>
+    filter(audits >= min_audits) |>
+    arrange({{ group_var1 }}, {{ group_var2 }}) |>
+    mutate(country = str_to_title(country)) |>
+    arrange(desc(total_pieces)) |>
+    slice_head(n = 10) |>
+    mutate(country = str_remove(country, "_")) |>
+    gt() |> 
+    tab_header(
+      title = md(
+        paste0(
+          "**Table.** Plastic cleanup profile by country and year for countries 
+          with at least ",
+           min_audits,
+          " audits."
+        )
+      )
+  ) |>
+  fmt_number(
+    columns = c(audits, total_pieces, median_pieces, mean_pieces, max_pieces),
+    decimals = 1,
+    use_seps = TRUE
+  ) |>
+  cols_label(
+    country = md("**Country**"),
+    year = md("**Year**"),
+    audits = md("**Audits**"),
+    total_pieces = md("**Total Pieces**"),
+    median_pieces = md("**Median Pieces**"),
+    mean_pieces = md("**Mean Pieces**"),
+    max_pieces = md("**Max Pieces**")
+  )
+}
+
+
+country_profile(plastics_clean, country, year, min_audits = 1) 
+```
+:::
+
+:::panel-tabset
+
+## Plot
+```{r}
+#| label: fig-Vizualization-1
+
+
+rate_ify <- function(df, numerator, denominator, name = rate){
+  stopifnot(is.data.frame(df))
+  df |>
+    mutate({{name}} := {{numerator}}/{{denominator}})
+}
+
+plastics_clean |> 
+  group_by(country, year) |> 
+  summarise(total_trash = sum(total),
+            num_events = mean(num_events),
+            .groups = "drop") |>
+  rate_ify(numerator = total_trash,
+           denominator = num_events,
+           name = avg_event_impact) |> 
+  mutate(country = str_to_title(country)) |>
+  filter(country %in% c("India",
+                        "China",
+                        "United States Of America",
+                        "Indonesia", 
+                        "Nigeria")) |>
+  mutate(country = fct_reorder(country, avg_event_impact)) |>
+  ggplot(aes(x = avg_event_impact, y = country)) +
+  geom_segment(aes(x = 0, xend = avg_event_impact,
+                   y = country, yend = country),
+               color = "gray60") +
+  geom_point(size = 4, color = "steelblue") +
+  facet_wrap(~ year) +
+  labs(
+    title = "Average Waste Accounted for per Audit",
+    subtitle = "Top 5 Most Populated Countries",
+    x = "Average Waste per Audit",
+    y = "",
+    alt = "Lollipop plot of the average waste per audit for 2019 and 2020 for the 5 most populated countries, India, China, USA, Indonesia, and Nigeria."
+  ) +
+  geom_text(aes(label = round(avg_event_impact, 1)), 
+          hjust = -0.3, 
+          size = 3) +
+  theme_minimal()
+```
+
+## Plot 2
+```{r}
+#| label: fig-Visualization-2
+
+plastics_clean |>
+  filter(country %in% c("India", "China", "United States of America",
+                        "Indonesia", "Nigeria")) |>
+  mutate(country = str_to_title(country)) |>
+  pivot_longer(cols = c(hdpe, ldpe, o, pet, pp, ps, pvc),
+               names_to = "plastic_type",
+               values_to = "count") |>
+  group_by(country, plastic_type) |>
+  summarise(total = sum(count, na.rm = TRUE), .groups = "drop") |>
+  mutate(plastic_type = fct_reorder(plastic_type, total)) |>
+  ggplot(aes(x = total, y = plastic_type, fill = plastic_type)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ country, scales = "free_x") +
+  scale_fill_brewer(palette = "Blues") +
+  labs(
+    title = "Most Abundant Plastic Types by 5 Most Populated Countries",
+    x = "Total Count",
+    y = "",
+    alt = "Bar graph of the amount of each plastic type found in audits from the 5 most populated countries, India, China, USA, Indonesia, and Nigeria."
+  ) +
+  theme_dark()
+```
+
+:::
+
+
+## Col
+:::panel-tabset
+## Table summary 1
+```{r}
+#| label: Table Reserch Question 2
+#| tbl-cap: "Summary of Plastic Compared to Environmental Indicators for the 5 Most Populated Countries"
+
+final_merged |>
+  group_by(country, year) |>
+  summarise(
+    total_plastic = sum(grand_total),
+    avg_plastic = mean(grand_total),
+    footprint_per_capita = first(EFConsPerCap[!is.na(EFConsPerCap)]),
+    biocapacity_per_capita = first(BiocapPerCap[!is.na(BiocapPerCap)]),
+    hdi = first(HDI[!is.na(HDI)]),
+    population = first(Population[!is.na(Population)]),
+    .groups = "drop"
+  ) |>
+  filter_out(country == "EMPTY") |>
+  filter(country %in% c("India",
+                        "China",
+                        "United States of America",
+                        "Indonesia", 
+                        "Nigeria")) |> 
+  mutate(country = str_to_title(country)) |> 
+  gt() |>
+  tab_header(
+    title = "Country-Year Summary of Plastics and Environmental Data"
+  ) |>
+  cols_label(
+    country = "Country",
+    year = "Year",
+    total_plastic = "Total Plastic Items Collected",
+    avg_plastic = "Average Plastic Items Collected",
+    footprint_per_capita = "Ecological Footprint per Capita",
+    biocapacity_per_capita = "Biocapacity per Capita",
+    hdi = "HDI",
+    population = "Population"
+  ) |>
+  fmt_number(
+    columns = c(total_plastic, avg_plastic, population),
+    decimals = 0
+  ) |>
+  fmt_number(
+    columns = c( footprint_per_capita, biocapacity_per_capita, hdi),
+    decimals = 2
+  )
+```
+
+## Table Summary 2
+```{r}
+#| label: Research question 2 table 2
+#| tbl-cap: "Percent of Plastic Types Compared to Largest Indurtry Sectors for the 5 Most Populated Countries"
+
+rate_ify2 <- function(df, numerators, denominator) {
+  stopifnot(is.data.frame(df))
+  
+  df |>
+    mutate(across(.cols = {{ numerators }},
+                  .fns = ~ .x / {{ denominator }},
+                  .names = "{.col}"))
+}
+
+final_merged |> 
+  group_by(country) |> 
+  summarise(hdpe = sum(hdpe),
+            ldpe = sum(ldpe),
+            o = sum(o),
+            pet = sum(pet),
+            pp = sum(pp),
+            ps = sum(ps),
+            pvc = sum(pvc),
+            total_waste = sum(total),
+            industry = mean(employment_industry),
+            service = mean(employment_services),
+            ag = mean(employment_agriculture),
+            .groups = "drop") |>
+  mutate(
+    largest_sector = case_when(
+      industry >= service & industry >= ag ~ "Industry",
+      service >= industry & service >= ag ~ "Service",
+      ag >= industry & ag >= service ~ "Agriculture"),
+    .after = total_waste ) |> 
+  filter(country %in% c("India",
+                        "China",
+                        "United States of America",
+                        "Indonesia", 
+                        "Nigeria")) |>
+  rate_ify2(numerator = hdpe:pvc,
+           denominator = total_waste) |> 
+
+  gt() |> 
+  tab_header(
+    title = "Proportions of Plastic Types Compared to Employment Sectorization",
+    subtitle = "Data from 2019 and 2020 Featuring the 5 Most Populated Countries") |> 
+  fmt_percent(
+    columns = hdpe:pvc,
+    decimals = 2) |> 
+  tab_style(style = cell_text(weight = "bold"),
+            locations = cells_column_labels()) |>
+  cols_label(country = "Country", 
+             total_waste = "Total Count of Plastics",
+             industry = "Percent of Employment in Industry Sector",
+             service = "Percent of Employment in Service Sector",
+             ag = "Percent of Employment in Agriculture Sector",
+             largest_sector = "Largest Employment Sector")
+```
+:::
+
+:::panel-tabset
+## ridge plot
+
+Teams sorted in descending order of total medals.
+
+```{r}
+#| label: Vizualization 1
+
+final_merged |> 
+  filter(year == 2019) |> 
+  group_by(country) |> 
+  summarize(unknown = sum(empty),
+            hdpe = sum(hdpe),
+            ldpe = sum(ldpe),
+            other = sum(o),
+            pet = sum(pet),
+            pp = sum(pp),
+            ps = sum(ps),
+            pvc = sum(pvc),
+            total = sum(total),
+            gdp_per_capita = mean(gdp_per_capita),
+            hdi = mean(HDI),
+            .groups = "drop") |> 
+  mutate(income_group = case_when(
+    gdp_per_capita < 1500 ~ "Low Income",
+    gdp_per_capita > 12000 ~ "High Income",
+    TRUE ~ "Middle Income")) |> 
+  pivot_longer(
+    cols = unknown:pvc,
+    names_to = "plastic_type",
+    values_to = "waste") |> 
+  filter(waste <= 3500) |> 
+  
+  ggplot(mapping = aes(x = waste,
+                       y = plastic_type,
+                       fill = income_group)) +
+  geom_density_ridges(alpha = 0.4) +
+  scale_fill_viridis(discrete=TRUE) +
+  labs(
+    title = "Plastic Waste Type Distribution of Countries by GDP per Capita",
+    subtitle = "Divided into <span style='color: #6a546f;'>High Income</span>, 
+      <span style='color: #b5aa5f;'>Middle Income</span>,
+    and <span style='color: #5e8684;'>Low Income</span>",
+    x = "Waste Amount",
+    y = "",
+    alt = "Density ridge plot showing the density of plastic waste audited
+    for multiple types of plastic. Colored by GDP per capita category,
+    High, Middle, and Low") +
+  theme_dark() +
+  theme(plot.subtitle =  element_markdown(),
+        legend.position = "none") 
+
+```
+
+## Bubble plot
+
+```{r}
+#| label: Vizualization 2
+#| warning: false
+
+final_merged |>
+  mutate(region = countrycode::countrycode(country,
+            origin = "country.name",
+            destination = "continent"),
+         total_normalized = total / num_events, 
+         gdp_trillions = gdp / 1e6) |>
+  filter_out(country == "EMPTY",
+           total == 0,
+           is.na(total),
+           is.na(gdp_trillions),
+           gdp_trillions == 0, 
+           is.na(region)) |>
+  group_by(country, region, year) |>
+  summarize(total_plastic = sum(total_normalized, na.rm = T), 
+            gdp_trillions = mean(gdp_trillions, na.rm = T), 
+            Population = mean(Population, na.rm = T)) |>
+  ggplot(aes(x = gdp_trillions, y = total_plastic, size = Population, 
+             color = region)) +
+    geom_point(alpha = 0.5) +
+    scale_size(range = c(.1, 15), name ="Population") +
+  labs(color = "Region",
+       x = "GDP (Trillions)", 
+       title = "Plastic Pollution Found in Audits vs. GDP for 2019 and 2020",
+       subtitle = "Total Plastic per Cleanup Event",
+       y = "",
+       alt = "Bubble chart showing plastic items found per cleanup event vs GDP in trillions,
+       colored by region and sized by population") +
+  coord_cartesian(ylim = c(0, 26000),
+                  xlim = c(0,25)) + 
+  scale_color_discrete(na.translate = FALSE) +
+  scale_x_sqrt() +
+  facet_wrap(~ year) +
+  theme_light() + scale_color_manual(values = c("Africa" = "mediumspringgreen", "Americas" = "orchid4", 
+                                "Asia" = "darkorange", "Europe" = "deeppink", 
+                                "Oceania" = "royalblue"))
+```
+
+:::
+
+## Col
+
+```{r}
+#| label: Data Model
+#| include: false
+
+model_df <- final_merged |>
+  group_by(country, year) |>
+  summarise(
+    total_plastic = sum(total, na.rm = TRUE),
+    Population = first(na.omit(Population)),
+    pop_density = first(na.omit(pop_density)),
+    employment_industry = first(na.omit(employment_industry)),
+    HDI = first(na.omit(HDI)),
+    gdp = first(na.omit(gdp)),
+    imports = first(na.omit(imports)),
+    infant_mortality = first(na.omit(infant_mortality)),
+    region = first(na.omit(region)),
+    .groups = "drop"
+  ) |>
+  mutate(
+    region = as.factor(region),
+    log_total_plastic = log(total_plastic)
+  ) 
+
+fit_1 <- lm(
+  log_total_plastic ~ Population + pop_density + region,
+  model_df
+)
+
+fit_2 <- lm(
+  log_total_plastic ~ Population + pop_density + employment_industry + region,
+  model_df
+)
+
+fit_3 <- lm(
+  log_total_plastic ~ Population + pop_density + HDI + region,
+  model_df
+)
+
+fit_4 <- lm(
+  log_total_plastic ~ Population + pop_density + imports + region,
+  model_df
+)
+
+fit_5 <- lm(
+  log_total_plastic ~ Population + pop_density + infant_mortality + region,
+  model_df
+)
+
+
+fit_6 <- lm(
+  log_total_plastic ~ Population + pop_density + region + gdp,
+  model_df
+)
+
+fit_7 <- lm(
+  log_total_plastic ~ Population + pop_density + region + gdp + imports,
+  model_df
+)
+
+adj_rsq <- list(
+  summary(fit_1)$adj.r.squared,
+  summary(fit_2)$adj.r.squared,
+  summary(fit_3)$adj.r.squared,
+  summary(fit_4)$adj.r.squared,
+  summary(fit_5)$adj.r.squared,
+  summary(fit_6)$adj.r.squared,
+  summary(fit_7)$adj.r.squared
+)
+
+adj_rsq
+
+
+vif_results <- list(
+  vif(fit_1),
+  vif(fit_2),
+  vif(fit_3),
+  vif(fit_4),
+  vif(fit_5),
+  vif(fit_6),
+  vif(fit_7)
+)
+
+
+```
+
+```{r}
+#| label: Data Model Output
+#| warning: false
+
+model_df <- final_merged |>
+  group_by(country, year) |>
+  summarise(
+    total_plastic = sum(total, na.rm = TRUE),
+    Population_millions = first(na.omit(Population)) / 1000000,
+    pop_density = first(na.omit(pop_density)),
+    gdp_billions = first(na.omit(gdp)) / 1000000000,
+    region = first(na.omit(region)),
+    .groups = "drop"
+  ) |>
+  mutate(
+    region = as.factor(region),
+    log_total_plastic = log(total_plastic)
+  ) 
+
+fit_6 <- lm(
+  log_total_plastic ~ Population_millions + pop_density + gdp_billions + region,
+  model_df
+)
+
+tbl <- tidy(fit_6, conf.int = TRUE) |>
+  mutate(
+    Predictor = dplyr::recode(term,
+      `(Intercept)` = "Intercept",
+      `Population_millions` = "Population (millions)",
+      `pop_density` = "Population Density",
+      `gdp_billions` = "GDP (billions)"
+    ),
+    Predictor = sub("^region", "Region: ", Predictor)
+  ) |>
+  select(
+    Predictor,
+    Estimate = estimate,
+    `Std. Error` = std.error,
+    `t value` = statistic,
+    `p value` = p.value,
+    `95% CI Lower` = conf.low,
+    `95% CI Upper` = conf.high
+  )
+
+tbl |>
+  gt() |>
+  tab_header(
+    title = md("**Linear Regression Predicting Logged Plastic Collected by Country, Year**"),
+    subtitle = "Response: log(total_plastic)"
+  ) |>
+  cols_label(
+    Predictor = md("**Predictor**"),
+    Estimate = md("**Estimate**"),
+    `Std. Error` = md("**Std. Error**"),
+    `t value` = md("**t value**"),
+    `p value` = md("**p value**"),
+    `95% CI Lower` = md("**95% CI Lower**"),
+    `95% CI Upper` = md("**95% CI Upper**")
+  ) |>
+  fmt_number(
+    columns = c(Estimate, `Std. Error`, `t value`, `95% CI Lower`, `95% CI Upper`),
+    decimals = 4
+  ) |>
+  fmt_number(columns = `p value`, decimals = 3) |>
+  tab_source_note(
+    source_note = md(
+       "The response variable was transformed as log(total_plastic) to meet linear regression assumptions"
+    )
+  )
+```
+
+
+
+
+
