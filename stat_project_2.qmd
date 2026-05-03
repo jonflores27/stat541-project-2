@@ -46,7 +46,7 @@ final_merged <- readRDS("full_table")
 ## Plastic Type Proportions
 
 ```{r}
-#| label: tbl-Data-Summary-1
+#| label: Data-Summary-1
 
 plastic_cols <- c("hdpe", "ldpe", "o", "pet", "pp", "ps", "pvc")
 
@@ -95,8 +95,7 @@ map(plastic_cols, function(col) {
 
 ## Audit Statistics
 ```{r}
-#| label: tbl-Data-Summary-2
-
+#| label: Data-Summary-2
 
 country_profile <- function(data, group_var1, group_var2, min_audits = 10) {
   data |>
@@ -104,18 +103,17 @@ country_profile <- function(data, group_var1, group_var2, min_audits = 10) {
     group_by({{ group_var1 }}, {{ group_var2 }}) |>
     summarise(
       audits = n(),
-      total_pieces = sum(grand_total),
-      median_pieces = median(grand_total),
-      mean_pieces = mean(grand_total),
-      max_pieces = max(grand_total),
+      total_pieces = sum(grand_total, na.rm = TRUE),
+      median_pieces = median(grand_total, na.rm = TRUE),
+      mean_pieces = mean(grand_total, na.rm = TRUE),
+      max_pieces = max(grand_total, na.rm = TRUE),
       .groups = "drop"
     ) |>
     filter(audits >= min_audits) |>
     arrange({{ group_var1 }}, {{ group_var2 }}) |>
     mutate(country = str_to_title(country)) |>
-    arrange(desc(total_pieces)) |>
-    slice_head(n = 10) |>
-    mutate(country = str_remove(country, "_")) |>
+    filter(country %in% c("India", "China", "United States Of America",
+                        "Indonesia", "Nigeria")) |>
     gt() |> 
     tab_header(
       title = md(
@@ -144,7 +142,7 @@ country_profile <- function(data, group_var1, group_var2, min_audits = 10) {
 }
 
 
-country_profile(plastics_clean, country, year, min_audits = 1) 
+country_profile(plastics_clean, country, year, min_audits = 1)
 ```
 :::
 
@@ -153,9 +151,8 @@ country_profile(plastics_clean, country, year, min_audits = 1)
 
 ## Waste per Audit
 ```{r}
-#| label: fig-Vizualization-1
-
-
+#| label: Vizualization-1
+#| fig-alt: "Lollipop plot comparing average waste per audit for India, China, the United States, Indonesia, and Nigeria in 2019 and 2020. Each country appears on the y-axis, average waste per audit appears on the x-axis, and separate panels compare the two years."
 rate_ify <- function(df, numerator, denominator, name = rate){
   stopifnot(is.data.frame(df))
   df |>
@@ -198,8 +195,8 @@ plastics_clean |>
 
 ## Plastic Types by Countries
 ```{r}
-#| label: fig-Visualization-2
-
+#| label: Visualization-2
+#| fig-alt: "Bar charts showing the total count of each plastic type collected in audits for India, China, the United States, Indonesia, and Nigeria. Each panel represents one country, and bars compare plastic types such as HDPE, LDPE, PET, PP, PS, PVC, and other plastics."
 plastics_clean |>
   filter(country %in% c("India", "China", "United States of America",
                         "Indonesia", "Nigeria")) |>
@@ -232,7 +229,6 @@ plastics_clean |>
 ## Environmental Metrics
 ```{r}
 #| label: Table Reserch Question 2
-#| tbl-cap: "Summary of Plastic Compared to Environmental Indicators for the 5 Most Populated Countries"
 
 final_merged |>
   group_by(country, year) |>
@@ -279,7 +275,7 @@ final_merged |>
 ## Employment Sectors
 ```{r}
 #| label: Research question 2 table 2
-#| tbl-cap: "Percent of Plastic Types Compared to Largest Indurtry Sectors for the 5 Most Populated Countries"
+
 
 rate_ify2 <- function(df, numerators, denominator) {
   stopifnot(is.data.frame(df))
@@ -304,12 +300,6 @@ final_merged |>
             service = mean(employment_services),
             ag = mean(employment_agriculture),
             .groups = "drop") |>
-  mutate(
-    largest_sector = case_when(
-      industry >= service & industry >= ag ~ "Industry",
-      service >= industry & service >= ag ~ "Service",
-      ag >= industry & ag >= service ~ "Agriculture"),
-    .after = total_waste ) |> 
   filter(country %in% c("India",
                         "China",
                         "United States of America",
@@ -327,12 +317,20 @@ final_merged |>
     decimals = 2) |> 
   tab_style(style = cell_text(weight = "bold"),
             locations = cells_column_labels()) |>
-  cols_label(country = "Country", 
+  cols_label(country = "Country",
+             o = "Other",
              total_waste = "Total Count of Plastics",
              industry = "Percent of Employment in Industry Sector",
              service = "Percent of Employment in Service Sector",
-             ag = "Percent of Employment in Agriculture Sector",
-             largest_sector = "Largest Employment Sector")
+             ag = "Percent of Employment in Agriculture Sector") |> 
+  data_color(columns = hdpe:pvc,
+             direction = "row",
+             palette = "PuBu"
+             ) |> 
+  data_color(columns = industry: ag,
+             direction = "row",
+             palette = "PuBu"
+             )
 ```
 :::
 
@@ -343,8 +341,8 @@ final_merged |>
 Teams sorted in descending order of total medals.
 
 ```{r}
-#| label: Vizualization 1
-
+#| label: Vizualization-3
+#| fig-alt: "Density ridge plot showing distributions of audited plastic waste amounts by plastic type for 2019. Ridges are grouped by plastic type, and color indicates GDP per capita income group: low income, middle income, or high income."
 final_merged |> 
   filter(year == 2019) |> 
   group_by(country) |> 
@@ -373,13 +371,16 @@ final_merged |>
   ggplot(mapping = aes(x = waste,
                        y = plastic_type,
                        fill = income_group)) +
-  geom_density_ridges(alpha = 0.4) +
-  scale_fill_viridis(discrete=TRUE) +
+  geom_density_ridges(alpha = 0.7) +
+  scale_fill_manual(values = c(
+  "High Income"   = "#58b4f5",
+  "Middle Income" = "#a8d8ea",
+  "Low Income"    = "#56e8c8")) +
   labs(
     title = "Plastic Waste Type Distribution of Countries by GDP per Capita",
-    subtitle = "Divided into <span style='color: #6a546f;'>High Income</span>, 
-      <span style='color: #b5aa5f;'>Middle Income</span>,
-    and <span style='color: #5e8684;'>Low Income</span>",
+    subtitle = "Divided into <span style='color: #58b4f5;'>High Income</span>, 
+      <span style='color: #a8d8ea;'>Middle Income</span>,
+    and <span style='color: #56e8c8;'>Low Income</span>",
     x = "Waste Amount",
     y = "",
     alt = "Density ridge plot showing the density of plastic waste audited
@@ -394,7 +395,8 @@ final_merged |>
 ## Plastic Type Count by GDP
 
 ```{r}
-#| label: Vizualization 2
+#| label: Vizualization-2
+#| fig-alt: "Bubble plot comparing plastic collected per cleanup event with GDP for countries in 2019 and 2020. Each point represents a country-year, the x-axis shows GDP in trillions, the y-axis shows total plastic per cleanup event, point size represents population, color represents region, and panels separate the two years."
 #| warning: false
 
 final_merged |>
@@ -415,7 +417,7 @@ final_merged |>
             Population = mean(Population, na.rm = T)) |>
   ggplot(aes(x = gdp_trillions, y = total_plastic, size = Population, 
              color = region)) +
-    geom_point(alpha = 0.5) +
+    geom_point(alpha = 0.7) +
     scale_size(range = c(.1, 15), name ="Population") +
   labs(color = "Region",
        x = "GDP (Trillions)", 
@@ -429,9 +431,14 @@ final_merged |>
   scale_color_discrete(na.translate = FALSE) +
   scale_x_sqrt() +
   facet_wrap(~ year) +
-  theme_light() + scale_color_manual(values = c("Africa" = "mediumspringgreen", "Americas" = "orchid4", 
-                                "Asia" = "darkorange", "Europe" = "deeppink", 
-                                "Oceania" = "royalblue"))
+  theme_light() + 
+  scale_color_manual(values = c(
+  "Africa"   = "#E69F00", 
+  "Americas" = "#56B4E9",
+  "Asia"     = "#009E73", 
+  "Europe"   = "#F0E442", 
+  "Oceania"  = "#0072B2"
+))
 ```
 
 :::
