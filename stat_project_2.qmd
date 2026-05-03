@@ -1,6 +1,6 @@
 ---
-title: "Plastic Audits"
-format:
+title: "test"
+format: 
   dashboard:
     orientation: columns
 logo: plastics.jpeg
@@ -39,10 +39,8 @@ plastics_clean <- plastics |>
 final_merged <- readRDS("full_table")
 ```
 
-
-
-### Row
 ## Col
+### Row
 :::panel-tabset
 
 ## Proportion of Plastic Type in most populated Countries
@@ -150,6 +148,7 @@ country_profile(plastics_clean, country, year, min_audits = 1)
 ```
 :::
 
+### Row
 :::panel-tabset
 
 ## Plot
@@ -228,6 +227,7 @@ plastics_clean |>
 
 
 ## Col
+### Row
 :::panel-tabset
 ## Table summary 1
 ```{r}
@@ -336,6 +336,7 @@ final_merged |>
 ```
 :::
 
+### Row
 :::panel-tabset
 ## ridge plot
 
@@ -436,7 +437,16 @@ final_merged |>
 :::
 
 ## Col
+### Row {height="30%"}
 
+:::{.card, title="Introduction}
+
+Reserach Questions:
+
+Other stuff, the why
+:::
+
+### Row
 ```{r}
 #| label: Data Model
 #| include: false
@@ -593,7 +603,10 @@ tbl |>
   )
 ```
 
+### Row {height="20%"}
 
+:::{.card, title="conclusions"}
 
+Concluding statement and overall reasons
 
-
+:::
