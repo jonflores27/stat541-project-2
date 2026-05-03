@@ -1,9 +1,16 @@
 ---
-title: "Environmental Plastic and Its Drivers"
+title: "Plastic Pollution and its Economic Drivers"
+author: "Jonathan Flores Martinez, Avery Stewart, Justin Mai"
+theme: cerulean
+embed-resources: true
 format: 
   dashboard:
     orientation: columns
 logo: plastics.jpeg
+execute: 
+  echo: false
+  warning: false
+  message: false
 nav-buttons:
       - icon: github
         href: https://github.com/jonflores27/stat541-project-2
@@ -35,18 +42,37 @@ plastics_clean <- plastics |>
   mutate(across(empty:pvc, ~replace_na(., 0)),
          total = rowSums(across(c(empty:pvc))),
          .before = num_events)
-
 final_merged <- readRDS("full_table")
 ```
 
-## Col
-### Row
-:::panel-tabset
+## Column - Research Questions {width="20%"}
 
-## Plastic Type Proportions
+### Row - Research Question 1 {height="50%"}
+
+::: card
+**Research Question 1**
+
+Which plastic types are the most abundant in the audits, and does this change from country to country?
+:::
+
+### Row - Research Question 2 {height="50%"}
+
+::: card
+**Research Question 2**
+
+How are demographic, economic, and geographic characteristics of countries associated with differences in plastic collected during cleanup audits?
+:::
+
+## Column - Tables
+
+### Row - Research Question 1 Tables {height="50%"}
+
+::: panel-tabset
+## Plastic Type Statistics
 
 ```{r}
-#| label: Data-Summary-1
+#| label: tbl-Data-Summary-1
+#| tbl-cap: "Summary of Each Plastic Type Across All Audits"
 
 plastic_cols <- c("hdpe", "ldpe", "o", "pet", "pp", "ps", "pvc")
 
@@ -92,28 +118,29 @@ map(plastic_cols, function(col) {
   )
 ```
 
+## Top Country Audit Summary
 
-## Audit Statistics
 ```{r}
-#| label: Data-Summary-2
-
+#| label: tbl-Data-Summary-2
+#| tbl-cap: "Summary Statistics of Audits for the 10 Countries with the Highest Amount of Plastic Collected"
 country_profile <- function(data, group_var1, group_var2, min_audits = 10) {
   data |>
     filter(!is.na(country), country != "EMPTY") |>
     group_by({{ group_var1 }}, {{ group_var2 }}) |>
     summarise(
       audits = n(),
-      total_pieces = sum(grand_total, na.rm = TRUE),
-      median_pieces = median(grand_total, na.rm = TRUE),
-      mean_pieces = mean(grand_total, na.rm = TRUE),
-      max_pieces = max(grand_total, na.rm = TRUE),
+      total_pieces = sum(total),
+      median_pieces = median(total),
+      mean_pieces = mean(grand_total),
+      max_pieces = max(grand_total),
       .groups = "drop"
     ) |>
     filter(audits >= min_audits) |>
     arrange({{ group_var1 }}, {{ group_var2 }}) |>
     mutate(country = str_to_title(country)) |>
-    filter(country %in% c("India", "China", "United States Of America",
-                        "Indonesia", "Nigeria")) |>
+    arrange(desc(total_pieces)) |>
+    slice_head(n = 10) |>
+    mutate(country = str_remove(country, "_")) |>
     gt() |> 
     tab_header(
       title = md(
@@ -142,93 +169,19 @@ country_profile <- function(data, group_var1, group_var2, min_audits = 10) {
 }
 
 
-country_profile(plastics_clean, country, year, min_audits = 1)
+country_profile(plastics_clean, country, year, min_audits = 1) 
 ```
 :::
 
-### Row
-:::panel-tabset
+### Row - Research Question 2 Tables {height="50%"}
 
-## Waste per Audit
-```{r}
-#| label: Vizualization-1
-#| fig-alt: "Lollipop plot comparing average waste per audit for India, China, the United States, Indonesia, and Nigeria in 2019 and 2020. Each country appears on the y-axis, average waste per audit appears on the x-axis, and separate panels compare the two years."
-rate_ify <- function(df, numerator, denominator, name = rate){
-  stopifnot(is.data.frame(df))
-  df |>
-    mutate({{name}} := {{numerator}}/{{denominator}})
-}
+::: panel-tabset
 
-plastics_clean |> 
-  group_by(country, year) |> 
-  summarise(total_trash = sum(total),
-            num_events = mean(num_events),
-            .groups = "drop") |>
-  rate_ify(numerator = total_trash,
-           denominator = num_events,
-           name = avg_event_impact) |> 
-  mutate(country = str_to_title(country)) |>
-  filter(country %in% c("India",
-                        "China",
-                        "United States Of America",
-                        "Indonesia", 
-                        "Nigeria")) |>
-  mutate(country = fct_reorder(country, avg_event_impact)) |>
-  ggplot(aes(x = avg_event_impact, y = country)) +
-  geom_segment(aes(x = 0, xend = avg_event_impact,
-                   y = country, yend = country),
-               color = "gray60") +
-  geom_point(size = 4, color = "steelblue") +
-  facet_wrap(~ year) +
-  labs(
-    title = "Average Waste Accounted for per Audit",
-    subtitle = "Top 5 Most Populated Countries",
-    x = "Average Waste per Audit",
-    y = "",
-    alt = "Lollipop plot of the average waste per audit for 2019 and 2020 for the 5 most populated countries, India, China, USA, Indonesia, and Nigeria."
-  ) +
-  geom_text(aes(label = round(avg_event_impact, 1)), 
-          hjust = -0.3, 
-          size = 3) +
-  theme_minimal()
-```
-
-## Plastic Types by Countries
-```{r}
-#| label: Visualization-2
-#| fig-alt: "Bar charts showing the total count of each plastic type collected in audits for India, China, the United States, Indonesia, and Nigeria. Each panel represents one country, and bars compare plastic types such as HDPE, LDPE, PET, PP, PS, PVC, and other plastics."
-plastics_clean |>
-  filter(country %in% c("India", "China", "United States of America",
-                        "Indonesia", "Nigeria")) |>
-  mutate(country = str_to_title(country)) |>
-  pivot_longer(cols = c(hdpe, ldpe, o, pet, pp, ps, pvc),
-               names_to = "plastic_type",
-               values_to = "count") |>
-  group_by(country, plastic_type) |>
-  summarise(total = sum(count, na.rm = TRUE), .groups = "drop") |>
-  mutate(plastic_type = fct_reorder(plastic_type, total)) |>
-  ggplot(aes(x = total, y = plastic_type, fill = plastic_type)) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ country, scales = "free_x") +
-  scale_fill_brewer(palette = "Blues") +
-  labs(
-    title = "Most Abundant Plastic Types by 5 Most Populated Countries",
-    x = "Total Count",
-    y = "",
-    alt = "Bar graph of the amount of each plastic type found in audits from the 5 most populated countries, India, China, USA, Indonesia, and Nigeria."
-  ) +
-  theme_dark()
-```
-
-:::
-
-
-## Col
-### Row
-:::panel-tabset
 ## Environmental Metrics
+
 ```{r}
 #| label: Table Reserch Question 2
+#| tbl-cap: "Summary of Plastic Compared to Environmental Indicators for the 5 Most Populated Countries"
 
 final_merged |>
   group_by(country, year) |>
@@ -273,9 +226,11 @@ final_merged |>
 ```
 
 ## Employment Sectors
-```{r}
-#| label: Research question 2 table 2
 
+```{r}
+
+#| label: tbl-Research question 2 table 2
+#| tbl-cap: "Percent of Plastic Types Compared to Largest Indurtry Sectors for the 5 Most Populated Countries"
 
 rate_ify2 <- function(df, numerators, denominator) {
   stopifnot(is.data.frame(df))
@@ -332,17 +287,98 @@ final_merged |>
              palette = "PuBu"
              )
 ```
+
 :::
 
-### Row
-:::panel-tabset
-## Waste Type Distribution by GDP
+## Column - Plots
 
-Teams sorted in descending order of total medals.
+### Row - Research Question 1 Plots {height="50%"}
+
+::: panel-tabset
+## Average Plastic Waste per Audit
 
 ```{r}
-#| label: Vizualization-3
-#| fig-alt: "Density ridge plot showing distributions of audited plastic waste amounts by plastic type for 2019. Ridges are grouped by plastic type, and color indicates GDP per capita income group: low income, middle income, or high income."
+#| label: fig-Vizualization-1
+#| fig-cap: "Lollipop Plot of Average Plastic Waster per Audit for 2019 and 2020 for the 5 Most Populated Countries"
+
+rate_ify <- function(df, numerator, denominator, name = rate){
+  stopifnot(is.data.frame(df))
+  df |>
+    mutate({{name}} := {{numerator}}/{{denominator}})
+}
+
+plastics_clean |> 
+  group_by(country, year) |> 
+  summarise(total_trash = sum(total),
+            num_events = mean(num_events),
+            .groups = "drop") |>
+  rate_ify(numerator = total_trash,
+           denominator = num_events,
+           name = avg_event_impact) |> 
+  mutate(country = str_to_title(country)) |>
+  filter(country %in% c("India",
+                        "China",
+                        "United States Of America",
+                        "Indonesia", 
+                        "Nigeria")) |>
+  mutate(country = fct_reorder(country, avg_event_impact)) |>
+  ggplot(aes(x = avg_event_impact, y = country)) +
+  geom_segment(aes(x = 0, xend = avg_event_impact,
+                   y = country, yend = country),
+               color = "gray60") +
+  geom_point(size = 4, color = "steelblue") +
+  facet_wrap(~ year) +
+  labs(
+    title = "Average Waste Accounted for per Audit",
+    subtitle = "Top 5 Most Populated Countries",
+    x = "Average Waste per Audit",
+    y = "",
+    alt = "Lollipop plot of the average waste per audit for 2019 and 2020 for the 5 most populated countries, India, China, USA, Indonesia, and Nigeria."
+  ) +
+  geom_text(aes(label = round(avg_event_impact, 1)), 
+          hjust = -0.3, 
+          size = 3) +
+  theme_minimal()
+```
+
+## Plastic Types by Country
+
+```{r}
+#| label: fig-Visualization-2
+#| fig-cap: "Most Abundant Plastic Types by 5 Most Populated Countries"
+plastics_clean |>
+  filter(country %in% c("India", "China", "United States of America",
+                        "Indonesia", "Nigeria")) |>
+  mutate(country = str_to_title(country)) |>
+  pivot_longer(cols = c(hdpe, ldpe, o, pet, pp, ps, pvc),
+               names_to = "plastic_type",
+               values_to = "count") |>
+  group_by(country, plastic_type) |>
+  summarise(total = sum(count, na.rm = TRUE), .groups = "drop") |>
+  mutate(plastic_type = fct_reorder(plastic_type, total)) |>
+  ggplot(aes(x = total, y = plastic_type, fill = plastic_type)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ country, scales = "free_x") +
+  scale_fill_brewer(palette = "Blues") +
+  labs(
+    title = "Most Abundant Plastic Types by 5 Most Populated Countries",
+    x = "Total Count",
+    y = "",
+    alt = "Bar graph of the amount of each plastic type found in audits from the 5 most populated countries, India, China, USA, Indonesia, and Nigeria."
+  ) +
+  theme_dark()
+```
+:::
+
+### Row - Research Question 2 Plots {height="50%"}
+
+::: panel-tabset
+## GDP per Capita Groups
+
+```{r}
+#| label: fig-Vizualization-3
+#| fig-cap: "Ridge Plot Showing the Amount of Plastic Waste for Each Type of Plastic"
+
 final_merged |> 
   filter(year == 2019) |> 
   group_by(country) |> 
@@ -392,11 +428,11 @@ final_merged |>
 
 ```
 
-## Plastic Type Count by GDP
+## GDP vs Plastic Pollution
 
 ```{r}
-#| label: Vizualization-2
-#| fig-alt: "Bubble plot comparing plastic collected per cleanup event with GDP for countries in 2019 and 2020. Each point represents a country-year, the x-axis shows GDP in trillions, the y-axis shows total plastic per cleanup event, point size represents population, color represents region, and panels separate the two years."
+#| label: fig-Vizualization-2
+#| fig-cap: "Bubble Plot of Plastic Pollution From Audits Against GDP for 2019 and 2020"
 #| warning: false
 
 final_merged |>
@@ -439,108 +475,16 @@ final_merged |>
   "Europe"   = "#F0E442", 
   "Oceania"  = "#0072B2"
 ))
-```
-
-:::
-
-## Col
-### Row {height="30%"}
-
-:::{.card, title="Introduction}
-
-Reserach Questions:
-
-Other stuff, the why
-:::
-
-### Row
-```{r}
-#| label: Data Model
-#| include: false
-
-model_df <- final_merged |>
-  group_by(country, year) |>
-  summarise(
-    total_plastic = sum(total, na.rm = TRUE),
-    Population = first(na.omit(Population)),
-    pop_density = first(na.omit(pop_density)),
-    employment_industry = first(na.omit(employment_industry)),
-    HDI = first(na.omit(HDI)),
-    gdp = first(na.omit(gdp)),
-    imports = first(na.omit(imports)),
-    infant_mortality = first(na.omit(infant_mortality)),
-    region = first(na.omit(region)),
-    .groups = "drop"
-  ) |>
-  mutate(
-    region = as.factor(region),
-    log_total_plastic = log(total_plastic)
-  ) 
-
-fit_1 <- lm(
-  log_total_plastic ~ Population + pop_density + region,
-  model_df
-)
-
-fit_2 <- lm(
-  log_total_plastic ~ Population + pop_density + employment_industry + region,
-  model_df
-)
-
-fit_3 <- lm(
-  log_total_plastic ~ Population + pop_density + HDI + region,
-  model_df
-)
-
-fit_4 <- lm(
-  log_total_plastic ~ Population + pop_density + imports + region,
-  model_df
-)
-
-fit_5 <- lm(
-  log_total_plastic ~ Population + pop_density + infant_mortality + region,
-  model_df
-)
-
-
-fit_6 <- lm(
-  log_total_plastic ~ Population + pop_density + region + gdp,
-  model_df
-)
-
-fit_7 <- lm(
-  log_total_plastic ~ Population + pop_density + region + gdp + imports,
-  model_df
-)
-
-adj_rsq <- list(
-  summary(fit_1)$adj.r.squared,
-  summary(fit_2)$adj.r.squared,
-  summary(fit_3)$adj.r.squared,
-  summary(fit_4)$adj.r.squared,
-  summary(fit_5)$adj.r.squared,
-  summary(fit_6)$adj.r.squared,
-  summary(fit_7)$adj.r.squared
-)
-
-adj_rsq
-
-
-vif_results <- list(
-  vif(fit_1),
-  vif(fit_2),
-  vif(fit_3),
-  vif(fit_4),
-  vif(fit_5),
-  vif(fit_6),
-  vif(fit_7)
-)
-
 
 ```
+:::
+
+## Column - Model {width="25%"}
+
+### Row - Research Question 2 Model {height="50%"}
 
 ```{r}
-#| label: Data Model Output
+#| label: Data Model Output1
 #| warning: false
 
 model_df <- final_merged |>
@@ -609,11 +553,3 @@ tbl |>
     )
   )
 ```
-
-### Row {height="20%"}
-
-:::{.card, title="conclusions"}
-
-Concluding statement and overall reasons
-
-:::
