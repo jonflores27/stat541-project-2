@@ -45,7 +45,7 @@ plastics_clean <- plastics |>
 final_merged <- readRDS("full_table")
 ```
 
-
+# Reseach Question
 
 ## Column - Research Questions {width="20%"}
 
@@ -555,4 +555,48 @@ tbl |>
     )
   )
 ```
+
+
+# Specific Country
+## col 
+### row
+:::{.card title="Specific Country"}
+this page focuses on a specific country from our database and their specific measures and policies that we believe may affect their plastic pollution generation shown by the audit.
+
+:::
+
+### row
+## col
+```{r}
+2+2
+```
+
+
+
+
+### Row
+```{r}
+2 + 2
+```
+```{r}
+final_merged |> 
+  colnames()
+```
+
+
+
+```{r}
+final_merged |> 
+  group_by(country, year) |> 
+  summarize(co2 = mean(co2_emissions),
+            unempl = mean(unemployment))
+```
+
+### row
+
+```{r}
+2+2
+```
+
+
 
