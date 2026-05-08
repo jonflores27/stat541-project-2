@@ -365,7 +365,7 @@ buttons <- lapply(seq_along(countries), function(i) {
 
   list(method = "update",
        args = list(list(visible = vis),
-                   list(title = paste("Top 7 Parent Companies in",
+                   list(title = paste("Top 7 Plastic Waste Producing Companies in",
                                       countries[i]),
                         xaxis = list(tickmode = "array",
                                      tickvals = 0:nrow(df),
