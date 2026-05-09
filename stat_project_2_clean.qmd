@@ -17,6 +17,7 @@ execute:
   message: false
 ---
 
+
 # Main Question
 
 ```{r}
@@ -44,14 +45,14 @@ plastics_clean <- plastics |>
          total = rowSums(across(c(empty:pvc))),
          .before = num_events)
 final_merged <- readRDS("full_table")
+
 ```
 
 
 
 ## Row - Research Question {height="11%"}
 
-::: card
-**Research Question**
+::: {.card title="Research Question"}
 
 How are demographic, economic, and geographic characteristics of countries associated with differences in plastic collected during cleanup audits?
 :::
@@ -116,7 +117,7 @@ final_merged |>
 
 ```{r}
 #| label: Research question 2 table 2
-#| tbl-cap: Percent of Plastic Types Compared to Largest Indurtry Sectors for the 5 Most Populated Countries
+#| tbl-cap: "Percent of Plastic Types Compared to Largest Indurtry Sectors for the 5 Most Populated Countries"
 
 rate_ify2 <- function(df, numerators, denominator) {
   stopifnot(is.data.frame(df))
@@ -283,9 +284,6 @@ final_merged |>
 ```
 :::
 
-
-
-
 ```{r}
 the_7 <- final_merged |> 
   filter(!parent_company %in% c("Grand Total", 
@@ -293,6 +291,7 @@ the_7 <- final_merged |>
                                 "null", 
                                 "NULL", 
                                 "Assorted")) |> 
+  mutate(country = str_to_title(country)) |>
   group_by(country, parent_company) |> 
   summarize(total = sum(total), .groups = "drop") |> 
   group_by(country) |> 
@@ -317,13 +316,6 @@ ggplot(mapping = aes(x = reorder(parent_company, total), y = total)) +
        y = "Total") +
   theme_minimal()
 ```
-
-
-
-
-
-
-
 
 
 
@@ -374,7 +366,7 @@ buttons <- lapply(seq_along(countries), function(i) {
 
 fig <- fig |>
   layout(updatemenus = list(
-    list(type = "dropdown",buttons = buttons)),
+    list(type = "dropdown", buttons = buttons)),
     title = paste("Top 7 Plastic Waste Producing Companies in", countries[1]),
     xaxis = list(title = "Parent Company"),
     yaxis = list(title = "Total Plastic Audited"),
@@ -383,20 +375,12 @@ fig <- fig |>
 fig
 ```
 
-
-
-
-
-
-
 ### Column - Model {width="50%"}
 
 
 ```{r}
 #| label: Data Model Output1
-#| eval: false
 #| warning: false
-#| include: false
 
 model_df <- final_merged |>
   group_by(country, year) |>
@@ -428,7 +412,7 @@ tbl <- tidy(fit_6, conf.int = TRUE) |>
     ),
     Predictor = sub("^region", "Region: ", Predictor)
   ) |>
-  select(
+  dplyr::select(
     Predictor,
     Estimate = estimate,
     `Std. Error` = std.error,
@@ -466,4 +450,98 @@ tbl |>
 ```
 
 
-# Secondary Question
+
+
+
+
+
+
+# Nigeria
+### Row - Plot of Nigeria
+
+```{r}
+#| warning: false
+
+library(sf)
+library(tidyverse)
+library(leaflet)
+
+my_shapefile <- st_read("nga_admin1.geojson", quiet = TRUE)
+nigera <- read_csv("data.csv")
+
+nigera_clean <- nigera |>
+  filter(State != "TOTAL") |>
+  mutate(
+    State = case_when(
+      State == "Abuja" ~ "Federal Capital Territory",
+      State == "Akwa-Ibom" ~ "Akwa Ibom",
+      State == "Cross-river" ~ "Cross River",
+      State == "Bayesa" ~ "Bayelsa",
+      TRUE ~ State
+    )
+  )
+
+plot_this <- my_shapefile |>
+  left_join(nigera_clean, by = c("adm1_name" = "State")) |>
+  mutate(
+    plastic_kg_per_person_year = (Ty / Population) / 11 * 1000
+  )
+
+centroids <- st_centroid(plot_this)
+
+pal <- colorBin(
+  palette = "Blues",
+  domain = plot_this$plastic_kg_per_person_year,
+  bins = c(0, 25, 50, 75, 100, 150, 250),
+  na.color = "grey80"
+)
+
+leaflet(plot_this) |>
+  addProviderTiles(providers$CartoDB.PositronNoLabels) |>
+  addPolygons(
+    fillColor = ~pal(plastic_kg_per_person_year),
+    fillOpacity = 0.8,
+    color = "black",
+    weight = 1,
+    popup = ~ifelse(
+      is.na(plastic_kg_per_person_year),
+      paste0("<b>", adm1_name, "</b><br>No data available"),
+      paste0(
+        "<b>", adm1_name, "</b>",
+        "<br>Total plastic (Ty): ", round(Ty, 0),
+        "<br>Population: ", Population,
+        "<br>Plastic per person: ",
+        round(plastic_kg_per_person_year, 2), " kg/year"
+      )
+    )
+  ) |>
+  addLabelOnlyMarkers(
+    data = centroids,
+    label = ~adm1_name,
+    labelOptions = labelOptions(
+      noHide = TRUE,
+      direction = "center",
+      style = list(
+        "font-weight" = "bold",
+        "color" = "black",
+        "font-size" = "9px",
+        "padding" = "2px"
+      )
+    )
+  ) |>
+  addLegend(
+    pal = pal,
+    values =  ~plastic_kg_per_person_year[!is.na(plastic_kg_per_person_year)],
+    title = "Plastic waste (kg per person per year)",
+    position = "bottomright"
+  ) |>
+  addControl(
+    "No data = grey states",
+    position = "bottomright"
+  ) |>
+  addControl(
+    "Data available for 28 states (2007–2017)",
+    position = "topright"
+  )
+
+```
