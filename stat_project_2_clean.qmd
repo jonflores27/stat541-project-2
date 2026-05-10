@@ -224,8 +224,8 @@ for (cty in countries) {
 
   fig <- fig |>
     add_bars(data = df,
-             x = ~parent_company,
-             y = ~total,
+             x = ~total,
+             y = ~parent_company,
              name = cty,
              visible = (cty == countries[1]))
 }
@@ -243,11 +243,11 @@ buttons <- lapply(seq_along(countries), function(i) {
        args = list(list(visible = vis),
                    list(title = paste("Top 7 Plastic Waste Producing Companies in",
                                       countries[i]),
-                        xaxis = list(tickmode = "array",
+                        yaxis = list(tickmode = "array",
                                      tickvals = 0:nrow(df),
                                      ticktext = df$parent_company))),
        
-                        yaxis = list(title = "Total Plastic Audited",
+                        xaxis = list(title = "Total Plastic Audited",
                                 autorange = TRUE
                               ),
        label = countries[i])})
@@ -256,8 +256,8 @@ fig <- fig |>
   layout(updatemenus = list(
     list(type = "dropdown", active = 0, buttons = buttons)),
     title = paste("Top 7 Plastic Waste Producing Companies in", countries[1]),
-    xaxis = list(title = "Parent Company"),
-     yaxis = list(
+    yaxis = list(title = "Parent Company"),
+     xaxis = list(
       title = "Total Plastic Audited",
       autorange = TRUE
     ),
