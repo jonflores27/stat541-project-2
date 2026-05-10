@@ -17,7 +17,6 @@ execute:
   message: false
 ---
 
-
 # Main Question
 
 ```{r}
@@ -37,6 +36,8 @@ library(ggtext)
 library(broom)
 library(scales)
 library(car)
+library(plotly)
+library(MASS)
 
 plastics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2021/2021-01-26/plastics.csv')
 
@@ -45,144 +46,28 @@ plastics_clean <- plastics |>
          total = rowSums(across(c(empty:pvc))),
          .before = num_events)
 final_merged <- readRDS("full_table")
-
 ```
 
 
 
-## Row - Research Question {height="11%"}
+## Row - Research Question {height="10%"}
 
-::: {.card title="Research Question"}
+::: {.card}
+**Research Question**
 
 How are demographic, economic, and geographic characteristics of countries associated with differences in plastic collected during cleanup audits?
 :::
 
-## Row {height="89%"}
+## Row {height="90%"}
 
-### Column {width="50%"}
+### Column {width="55%"}
 
-#### Row {height="50%"}
-
-
-::: panel-tabset
-## Environmental Metrics
-
-```{r}
-#| label: Table Reserch Question 2
-#| tbl-cap: "Summary of Plastic Compared to Environmental Indicators for the 5 Most Populated Countries"
-
-final_merged |>
-  group_by(country, year) |>
-  summarise(
-    total_plastic = sum(grand_total),
-    avg_plastic = mean(grand_total),
-    footprint_per_capita = first(EFConsPerCap[!is.na(EFConsPerCap)]),
-    biocapacity_per_capita = first(BiocapPerCap[!is.na(BiocapPerCap)]),
-    hdi = first(HDI[!is.na(HDI)]),
-    population = first(Population[!is.na(Population)]),
-    .groups = "drop"
-  ) |>
-  filter_out(country == "EMPTY") |>
-  filter(country %in% c("India",
-                        "China",
-                        "United States of America",
-                        "Indonesia", 
-                        "Nigeria")) |> 
-  mutate(country = str_to_title(country)) |> 
-  gt() |>
-  tab_header(
-    title = "Country-Year Summary of Plastics and Environmental Data"
-  ) |>
-  cols_label(
-    country = "Country",
-    year = "Year",
-    total_plastic = "Total Plastic Items Collected",
-    avg_plastic = "Average Plastic Items Collected",
-    footprint_per_capita = "Ecological Footprint per Capita",
-    biocapacity_per_capita = "Biocapacity per Capita",
-    hdi = "HDI",
-    population = "Population"
-  ) |>
-  fmt_number(
-    columns = c(total_plastic, avg_plastic, population),
-    decimals = 0
-  ) |>
-  fmt_number(
-    columns = c( footprint_per_capita, biocapacity_per_capita, hdi),
-    decimals = 2
-  )
-```
-
-## Employment Sectors
-
-```{r}
-#| label: Research question 2 table 2
-#| tbl-cap: "Percent of Plastic Types Compared to Largest Indurtry Sectors for the 5 Most Populated Countries"
-
-rate_ify2 <- function(df, numerators, denominator) {
-  stopifnot(is.data.frame(df))
-  
-  df |>
-    mutate(across(.cols = {{ numerators }},
-                  .fns = ~ .x / {{ denominator }},
-                  .names = "{.col}"))
-}
-
-final_merged |> 
-  group_by(country) |> 
-  summarise(hdpe = sum(hdpe),
-            ldpe = sum(ldpe),
-            o = sum(o),
-            pet = sum(pet),
-            pp = sum(pp),
-            ps = sum(ps),
-            pvc = sum(pvc),
-            total_waste = sum(total),
-            industry = mean(employment_industry),
-            service = mean(employment_services),
-            ag = mean(employment_agriculture),
-            .groups = "drop") |>
-  mutate(
-    largest_sector = case_when(
-      industry >= service & industry >= ag ~ "Industry",
-      service >= industry & service >= ag ~ "Service",
-      ag >= industry & ag >= service ~ "Agriculture"),
-    .after = total_waste ) |> 
-  filter(country %in% c("India",
-                        "China",
-                        "United States of America",
-                        "Indonesia", 
-                        "Nigeria")) |>
-  rate_ify2(numerator = hdpe:pvc,
-           denominator = total_waste) |> 
-
-  gt() |> 
-  tab_header(
-    title = "Proportions of Plastic Types Compared to Employment Sectorization",
-    subtitle = "Data from 2019 and 2020 Featuring the 5 Most Populated Countries") |> 
-  fmt_percent(
-    columns = hdpe:pvc,
-    decimals = 2) |> 
-  tab_style(style = cell_text(weight = "bold"),
-            locations = cells_column_labels()) |>
-  cols_label(country = "Country", 
-             total_waste = "Total Count of Plastics",
-             industry = "Percent of Employment in Industry Sector",
-             service = "Percent of Employment in Service Sector",
-             ag = "Percent of Employment in Agriculture Sector",
-             largest_sector = "Largest Employment Sector")
-```
-:::
-
-
-#### Row {height="50%"}
-
+#### Row {height="60%}
 ::: panel-tabset
 ## GDP per Capita Groups
 
 ```{r}
-#| label: fig-Vizualization-3
-#| fig-cap: "Ridge Plot Showing the Amount of Plastic Waste for Each Type of Plastic"
+#| label: Vizualization-3
 
 final_merged |> 
   filter(year == 2019) |> 
@@ -236,8 +121,7 @@ final_merged |>
 ## GDP vs Plastic Pollution
 
 ```{r}
-#| label: fig-Vizualization-2
-#| fig-cap: "Bubble Plot of Plastic Pollution From Audits Against GDP for 2019 and 2020"
+#| label: Vizualization-2
 #| warning: false
 
 final_merged |>
@@ -284,6 +168,9 @@ final_merged |>
 ```
 :::
 
+#### Row 
+
+
 ```{r}
 the_7 <- final_merged |> 
   filter(!parent_company %in% c("Grand Total", 
@@ -319,13 +206,7 @@ ggplot(mapping = aes(x = reorder(parent_company, total), y = total)) +
 
 
 
-
-
-
 ```{r}
-library(tidyverse)
-library(plotly)
-library(MASS)
 
 countries <- unique(the_7$country)
 
@@ -375,8 +256,8 @@ fig <- fig |>
 fig
 ```
 
-### Column - Model {width="50%"}
 
+### Column - Model {width="45%"}
 
 ```{r}
 #| label: Data Model Output1
@@ -453,11 +334,18 @@ tbl |>
 
 
 
-
-
-
 # Nigeria
-### Row - Plot of Nigeria
+
+## Row - Why Nigeria? {height="25%"}
+
+::: {.card title="Why Nigeria?"}
+
+
+Nigeria ranks among the highest contributors to plastic waste in our dataset when summarized over all years. This made it a compelling country for more exploration and understanding other factors that contribute to the high levels of plastic pollution. By focusing on Nigeria, we aim to uncover how environmental conditions and governmental infrastructure may affect the country's plastic waste output.
+
+:::
+
+## Row - Plot of Nigeria
 
 ```{r}
 #| warning: false
