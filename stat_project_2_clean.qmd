@@ -206,7 +206,10 @@ ggplot(mapping = aes(x = reorder(parent_company, total), y = total)) +
 
 
 
+
 ```{r}
+#COPY THIS TABLE FOR CHANGE
+
 
 countries <- unique(the_7$country)
 
@@ -224,7 +227,7 @@ for (cty in countries) {
              x = ~parent_company,
              y = ~total,
              name = cty,
-             visible = FALSE)
+             visible = (cty == countries[1]))
 }
 
 buttons <- lapply(seq_along(countries), function(i) {
@@ -243,14 +246,21 @@ buttons <- lapply(seq_along(countries), function(i) {
                         xaxis = list(tickmode = "array",
                                      tickvals = 0:nrow(df),
                                      ticktext = df$parent_company))),
+       
+                        yaxis = list(title = "Total Plastic Audited",
+                                autorange = TRUE
+                              ),
        label = countries[i])})
 
 fig <- fig |>
   layout(updatemenus = list(
-    list(type = "dropdown", buttons = buttons)),
+    list(type = "dropdown", active = 0, buttons = buttons)),
     title = paste("Top 7 Plastic Waste Producing Companies in", countries[1]),
     xaxis = list(title = "Parent Company"),
-    yaxis = list(title = "Total Plastic Audited"),
+     yaxis = list(
+      title = "Total Plastic Audited",
+      autorange = TRUE
+    ),
     showlegend = FALSE)
 
 fig
