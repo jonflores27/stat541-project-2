@@ -60,7 +60,7 @@ How are demographic, economic, and geographic characteristics of countries assoc
 
 ## Row {height="90%"}
 
-### Column {width="55%"}
+### Column {width="45%"}
 
 #### Row {height="60%}
 ::: panel-tabset
@@ -257,7 +257,125 @@ fig
 ```
 
 
-### Column - Model {width="45%"}
+### Column - Model {width="55%"}
+#### Row {height="55%"}
+
+::: panel-tabset
+
+## Environmental Metrics
+
+```{r}
+#| label: Table Reserch Question 2
+#| tbl-cap: "Summary of Plastic Compared to Environmental Indicators for the 5 Most Populated Countries"
+
+final_merged |>
+  group_by(country, year) |>
+  summarise(
+    total_plastic = sum(total),
+    avg_plastic = mean(total),
+    footprint_per_capita = first(EFConsPerCap[!is.na(EFConsPerCap)]),
+    biocapacity_per_capita = first(BiocapPerCap[!is.na(BiocapPerCap)]),
+    hdi = first(HDI[!is.na(HDI)]),
+    population = first(Population[!is.na(Population)]),
+    .groups = "drop"
+  ) |>
+  filter_out(country == "EMPTY") |>
+  filter(country %in% c("India",
+                        "China",
+                        "United States of America",
+                        "Indonesia", 
+                        "Nigeria")) |> 
+  mutate(country = str_to_title(country)) |> 
+  gt() |>
+  tab_header(
+    title = "Country-Year Summary of Plastics and Environmental Data"
+  ) |>
+  cols_label(
+    country = "Country",
+    year = "Year",
+    total_plastic = "Total Plastic Items Collected",
+    avg_plastic = "Average Plastic Items Collected",
+    footprint_per_capita = "Ecological Footprint per Capita",
+    biocapacity_per_capita = "Biocapacity per Capita",
+    hdi = "HDI",
+    population = "Population"
+  ) |>
+  fmt_number(
+    columns = c(total_plastic, avg_plastic, population),
+    decimals = 0
+  ) |>
+  fmt_number(
+    columns = c( footprint_per_capita, biocapacity_per_capita, hdi),
+    decimals = 2
+  )
+```
+
+## Employment Sectors
+
+```{r}
+
+#| label: tbl-Research question 2 table 2
+#| tbl-cap: "Percent of Plastic Types Compared to Largest Indurtry Sectors for the 5 Most Populated Countries"
+
+rate_ify2 <- function(df, numerators, denominator) {
+  stopifnot(is.data.frame(df))
+  
+  df |>
+    mutate(across(.cols = {{ numerators }},
+                  .fns = ~ .x / {{ denominator }},
+                  .names = "{.col}"))
+}
+
+final_merged |> 
+  group_by(country) |> 
+  summarise(hdpe = sum(hdpe),
+            ldpe = sum(ldpe),
+            o = sum(o),
+            pet = sum(pet),
+            pp = sum(pp),
+            ps = sum(ps),
+            pvc = sum(pvc),
+            total_waste = sum(total),
+            industry = mean(employment_industry),
+            service = mean(employment_services),
+            ag = mean(employment_agriculture),
+            .groups = "drop") |>
+  filter(country %in% c("India",
+                        "China",
+                        "United States of America",
+                        "Indonesia", 
+                        "Nigeria")) |>
+  rate_ify2(numerator = hdpe:pvc,
+           denominator = total_waste) |> 
+
+  gt() |> 
+  tab_header(
+    title = "Proportions of Plastic Types Compared to Employment Sectorization",
+    subtitle = "Data from 2019 and 2020 Featuring the 5 Most Populated Countries") |> 
+  fmt_percent(
+    columns = hdpe:pvc,
+    decimals = 2) |> 
+  tab_style(style = cell_text(weight = "bold"),
+            locations = cells_column_labels()) |>
+  cols_label(country = "Country",
+             o = "Other",
+             total_waste = "Total Count of Plastics",
+             industry = "Percent of Employment in Industry Sector",
+             service = "Percent of Employment in Service Sector",
+             ag = "Percent of Employment in Agriculture Sector") |> 
+  data_color(columns = hdpe:pvc,
+             direction = "row",
+             palette = "PuBu"
+             ) |> 
+  data_color(columns = industry: ag,
+             direction = "row",
+             palette = "PuBu"
+             )
+```
+
+:::
+
+#### Row {height="40%"}
 
 ```{r}
 #| label: Data Model Output1
