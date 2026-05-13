@@ -64,8 +64,58 @@ How are demographic, economic, and geographic characteristics of countries assoc
 
 #### Row {height="60%}
 ::: panel-tabset
-## GDP per Capita Groups
+## GDP vs Plastic Pollution
+GDP is the one of the most popular measures of a country's economic health. In this plot, we can see how that surface level measurement relates to the plastic audited by region throught the world.
 
+```{r}
+#| label: Vizualization-2
+#| warning: false
+
+final_merged |>
+  mutate(region = countrycode::countrycode(country,
+            origin = "country.name",
+            destination = "continent"),
+         total_normalized = total / num_events, 
+         gdp_trillions = gdp / 1e6) |>
+  filter_out(country == "EMPTY",
+           total == 0,
+           is.na(total),
+           is.na(gdp_trillions),
+           gdp_trillions == 0, 
+           is.na(region)) |>
+  group_by(country, region, year) |>
+  summarize(total_plastic = sum(total_normalized, na.rm = T), 
+            gdp_trillions = mean(gdp_trillions, na.rm = T), 
+            Population = mean(Population, na.rm = T)) |>
+  ggplot(aes(x = gdp_trillions, y = total_plastic, size = Population, 
+             color = region)) +
+    geom_point(alpha = 0.7) +
+    scale_size(range = c(.1, 15), name ="Population") +
+  labs(color = "Region",
+       x = "GDP (Trillions)", 
+       title = "Plastic Pollution Found in Audits vs. GDP for 2019 and 2020",
+       subtitle = "Average Amount of Plastic Audited per Cleanup Event in a Country",
+       y = "",
+       alt = "Bubble chart showing plastic items found per cleanup event vs GDP in trillions,
+       colored by region and sized by population") +
+  coord_cartesian(ylim = c(0, 26000),
+                  xlim = c(0,25)) + 
+  scale_color_discrete(na.translate = FALSE) +
+  scale_x_sqrt() +
+  facet_wrap(~ year) +
+  theme_light() + 
+  scale_color_manual(values = c(
+  "Africa"   = "#E69F00", 
+  "Americas" = "#56B4E9",
+  "Asia"     = "#009E73", 
+  "Europe"   = "#F0E442", 
+  "Oceania"  = "#0072B2"
+))
+
+```
+
+## GDP per Capita Groups
+The plastic audited in a country can be affected by the country's economic health. This plot differentiates this health by the GDP per Capita metric. Once again often used to denote economic health.
 ```{r}
 #| label: Vizualization-3
 
@@ -107,69 +157,22 @@ final_merged |>
     subtitle = "Divided into <span style='color: #58b4f5;'>High Income</span>, 
       <span style='color: #a8d8ea;'>Middle Income</span>,
     and <span style='color: #56e8c8;'>Low Income</span>",
-    x = "Waste Amount",
+    x = "Plastic Waste Units Audited",
     y = "",
     alt = "Density ridge plot showing the density of plastic waste audited
     for multiple types of plastic. Colored by GDP per capita category,
     High, Middle, and Low") +
-  theme_dark() +
+  theme_minimal() +
   theme(plot.subtitle =  element_markdown(),
         legend.position = "none") 
 
 ```
 
-## GDP vs Plastic Pollution
 
-```{r}
-#| label: Vizualization-2
-#| warning: false
 
-final_merged |>
-  mutate(region = countrycode::countrycode(country,
-            origin = "country.name",
-            destination = "continent"),
-         total_normalized = total / num_events, 
-         gdp_trillions = gdp / 1e6) |>
-  filter_out(country == "EMPTY",
-           total == 0,
-           is.na(total),
-           is.na(gdp_trillions),
-           gdp_trillions == 0, 
-           is.na(region)) |>
-  group_by(country, region, year) |>
-  summarize(total_plastic = sum(total_normalized, na.rm = T), 
-            gdp_trillions = mean(gdp_trillions, na.rm = T), 
-            Population = mean(Population, na.rm = T)) |>
-  ggplot(aes(x = gdp_trillions, y = total_plastic, size = Population, 
-             color = region)) +
-    geom_point(alpha = 0.7) +
-    scale_size(range = c(.1, 15), name ="Population") +
-  labs(color = "Region",
-       x = "GDP (Trillions)", 
-       title = "Plastic Pollution Found in Audits vs. GDP for 2019 and 2020",
-       subtitle = "Total Plastic per Cleanup Event",
-       y = "",
-       alt = "Bubble chart showing plastic items found per cleanup event vs GDP in trillions,
-       colored by region and sized by population") +
-  coord_cartesian(ylim = c(0, 26000),
-                  xlim = c(0,25)) + 
-  scale_color_discrete(na.translate = FALSE) +
-  scale_x_sqrt() +
-  facet_wrap(~ year) +
-  theme_light() + 
-  scale_color_manual(values = c(
-  "Africa"   = "#E69F00", 
-  "Americas" = "#56B4E9",
-  "Asia"     = "#009E73", 
-  "Europe"   = "#F0E442", 
-  "Oceania"  = "#0072B2"
-))
+## Bars
 
-```
-:::
-
-#### Row 
-
+The presence of large corporations withing a country may also affect the plastic produced. This talbe explores which companies produce the most plastic waste that was audited within a country.
 
 ```{r}
 the_7 <- final_merged |> 
@@ -178,33 +181,16 @@ the_7 <- final_merged |>
                                 "null", 
                                 "NULL", 
                                 "Assorted")) |> 
-  mutate(country = str_to_title(country)) |>
+  mutate(country = str_to_title(country),
+         country = case_when(country == "United Kingdom Of Great Britain & Northern Ireland" ~ "UK & Northern Ireland",
+                             country == "Taiwan_ Republic Of China (Roc)" ~ "Taiwan",
+                             .default = country)) |>
   group_by(country, parent_company) |> 
   summarize(total = sum(total), .groups = "drop") |> 
   group_by(country) |> 
   slice_max(order_by = total, n = 7, with_ties = FALSE) |> 
   ungroup()
 ```
-
-
-
-
-```{r}
-#| execute: false
-#| include: false
-
-the_7 |> 
-  filter(country == "Argentina") |> 
-
-ggplot(mapping = aes(x = reorder(parent_company, total), y = total)) +
-  geom_col() +
-  labs(title = "Top 7 Parent Companies in Argentina",
-       x = "Parent Company",
-       y = "Total") +
-  theme_minimal()
-```
-
-
 
 
 ```{r}
@@ -265,6 +251,9 @@ fig <- fig |>
 
 fig
 ```
+:::
+
+
 
 
 ### Column - Model {width="55%"}
