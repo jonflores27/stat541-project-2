@@ -17,7 +17,7 @@ execute:
   message: false
 ---
 
-# Main Question
+# The World
 
 ```{r}
 #| label: Libraries
@@ -192,10 +192,8 @@ the_7 <- final_merged |>
   ungroup()
 ```
 
-
 ```{r}
 #COPY THIS TABLE FOR CHANGE
-
 
 countries <- unique(the_7$country)
 
@@ -213,44 +211,52 @@ for (cty in countries) {
              x = ~total,
              y = ~parent_company,
              name = cty,
-             visible = (cty == countries[1]))
+             visible = (cty == countries[1]),
+             orientation = "h")
 }
 
 buttons <- lapply(seq_along(countries), function(i) {
-
   df <- the_7 |>
     filter(country == countries[i]) |>
     arrange(total)
-
+  
   vis <- rep(FALSE, length(countries))
   vis[i] <- TRUE
 
   list(method = "update",
        args = list(list(visible = vis),
-                   list(title = paste("Top 7 Plastic Waste Producing Companies in",
-                                      countries[i]),
-                        yaxis = list(tickmode = "array",
-                                     tickvals = 0:nrow(df),
-                                     ticktext = df$parent_company))),
-       
-                        xaxis = list(title = "Total Plastic Audited",
-                                autorange = TRUE
-                              ),
-       label = countries[i])})
+                   list(title = paste(
+                     "Top 7 Plastic Waste Producing Companies in", 
+                     countries[i]),
+                     yaxis = list(title = "Parent Company"),
+                     xaxis = list(title = "Total Plastic Audited",
+                                  autorange = TRUE))),
+       label = countries[i])
+})
 
 fig <- fig |>
-  layout(updatemenus = list(
-    list(type = "dropdown", active = 0, buttons = buttons)),
-    title = paste("Top 7 Plastic Waste Producing Companies in", countries[1]),
-    yaxis = list(title = "Parent Company"),
-     xaxis = list(
-      title = "Total Plastic Audited",
-      autorange = TRUE
-    ),
-    showlegend = FALSE)
+  layout(margin = list(t = 120, l = 220),
+         updatemenus = list(list(type = "dropdown",
+                                 active = 0,
+                                 buttons = buttons,
+                                 x = 0,
+                                 y = 1.25,
+                                 xanchor = "left",
+                                 yanchor = "top",
+                                 pad = list(r = 10, t = 10))),
+         title = list(text = paste("Top 7 Plastic Waste Producing Companies in",
+                                   countries[1]),
+                      y = .85),
+         yaxis = list(title = "Parent Company"),
+         xaxis = list(title = "Total Plastic Audited", autorange = TRUE),
+         showlegend = FALSE)
 
 fig
+
+# Ik it comes out overlapping here but its fine when it renders.
 ```
+
+
 :::
 
 
