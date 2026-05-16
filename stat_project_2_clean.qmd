@@ -126,13 +126,13 @@ How are demographic, economic, and geographic characteristics of countries assoc
 
 ## Row {height="90%"}
 
-### Column {width="45%"}
+### Column {width="40%"}
 
-#### Row {height="60%"}
+#### Row {height="45%"}
 ::: panel-tabset
 ## GDP vs Plastic Pollution
 ::: {.card title="The Big Picture"}
-GDP is the one of the most popular measures of a country's economic health. In this plot, we can see how that surface level measurement relates to the plastic audited by region throught the world.
+GDP is the one of the most popular measures of a country's economic health. In this plot, we can see how that surface level measurement relates to the plastic audited by region through the world.
 
 ```{r}
 #| label: Vizualization-2
@@ -184,7 +184,7 @@ final_merged |>
 
 ## GDP vs Plastic Types
 ::: {.card title="Platic Types by GDP Categories"}
-The plastic audited in a country can be affected by the country's economic health. This plot differentiates this health by the GDP per Capita metric. Once again often used to denote economic health.
+The plastic type audited in a country may be affected by the country's economic health. This plot differentiates this health by the GDP per Capita metric. Once again often used to denote economic health.
 ```{r}
 #| label: Vizualization-3
 
@@ -218,14 +218,14 @@ final_merged |>
                        fill = income_group)) +
   geom_density_ridges(alpha = 0.7) +
   scale_fill_manual(values = c(
-  "High Income"   = "#58b4f5",
-  "Middle Income" = "#a8d8ea",
-  "Low Income"    = "#56e8c8")) +
+  "High Income"   = "#E69F00",
+  "Middle Income" = "#009E73",
+  "Low Income"    = "#0072B2")) +
   labs(
     title = "Plastic Waste Type Distribution of Countries by GDP per Capita",
-    subtitle = "Divided into <span style='color: #58b4f5;'>High Income</span>, 
-      <span style='color: #a8d8ea;'>Middle Income</span>,
-    and <span style='color: #56e8c8;'>Low Income</span>",
+    subtitle = "Divided into <span style='color: #E69F00;'>High Income</span>, 
+      <span style='color: #009E73;'>Middle Income</span>,
+    and <span style='color: #0072B2;'>Low Income</span>",
     x = "Plastic Waste Units Audited",
     y = "",
     alt = "Density ridge plot showing the density of plastic waste audited
@@ -241,7 +241,7 @@ final_merged |>
 
 ## Waste Producers
 ::: {.card title="Economic Drivers = Plastic Waste Generators???"}
-The presence of large corporations withing a country may also affect the plastic produced. This talbe explores which companies produce the most plastic waste that was audited within a country.
+The presence of large corporations withing a country may also affect the plastic produced. This table explores which companies produce the most plastic waste that was audited within a country.
 
 ```{r}
 the_7 <- final_merged |> 
@@ -451,7 +451,12 @@ final_merged |>
 
 :::
 
-#### Row {height="40%"}
+#### Row {height="50%"}
+::: {.card}
+::: {style="font-size: 10px;"}
+The model suggests that log population was the only significant predictor \{b = 0.928, SE = 0.408, t = 2.272, p = 0.028, with a 95% CI [0.106, 1.750]\} of logged plastic collected after accounting for country level differences rather than GDP, population density, year, or region.
+:::
+
 ```{r}
 #| label: Data Model
 #| include: false
@@ -538,7 +543,7 @@ anova(fit_final_maybe) |>
 
 ```
 
-
+:::
 
 
 # Nigeria
