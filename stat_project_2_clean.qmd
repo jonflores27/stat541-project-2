@@ -54,9 +54,15 @@ plastics_clean <- plastics |>
 final_merged <- readRDS("full_table")
 
 state_gdp <- read_csv("nigeria_state_gdp.csv")
+census <- read_csv("nigera-2020.csv")
+
 
 state_gdp_clean <- state_gdp |>
   mutate(State = str_remove(State, " State"))
+
+census_clean <- census |> 
+  mutate(State = str_remove(State, " State"),
+         `Population 2020 projected` = `Population 2020 projected`/1000000)
 
 
 my_shapefile <- st_read("nga_admin1.geojson", quiet = TRUE)
@@ -84,8 +90,14 @@ plot_this2 <- my_shapefile |>
   left_join(state_gdp_clean, by = join_by(adm1_name == State)) |>
   mutate(gdp_bil_usd = `GDP (bil. US$)`)
 
+plot_this3 <- my_shapefile |> 
+  left_join(census_clean, by = join_by(adm1_name == State))
+  
+
 
 centroids <- st_centroid(plot_this)
+centroids3 <- st_centroid(plot_this3)
+
 
 
 
@@ -112,6 +124,10 @@ model_df <- final_merged |>
     log_pop_density = log(pop_density),
     log_gdp_billions = log(gdp_billions)
   ) 
+
+
+
+
 ```
 
 
@@ -568,7 +584,8 @@ selectInput(
   "Select metric to display:",
   choices = c(
     "Plastic waste (kg/person/year)" = "plastic",
-    "GDP (billion US$)"              = "gdp"
+    "GDP (billion US$)"              = "gdp",
+    "Population 2020 (millions)"     = "population"
   ),
   selected = "plastic"
 )
@@ -682,5 +699,54 @@ output$map <- renderLeaflet({
       ) |>
       addControl("No data = grey states", position = "bottomright")
   }
+  
+  else if (input$metric == "population") {
+
+    pal <- colorBin(
+      palette  = "Purples",
+      domain   = plot_this$`Population 2020 projected`,
+      bins     = c(0, 3, 6, 7, 8, 9, 10),
+      na.color = "grey80"
+    )
+
+    leaflet(plot_this3) |>
+      addProviderTiles(providers$CartoDB.PositronNoLabels) |>
+      addPolygons(
+        fillColor   = ~pal(`Population 2020 projected`),
+        fillOpacity = 0.8,
+        color       = "black",
+        weight      = 1,
+        popup = ~ifelse(
+          is.na(`Population 2020 projected`),
+          paste0("<b>", adm1_name, "</b><br>No data available"),
+          paste0(
+            "<b>", adm1_name, "</b>",
+            "<br>Populqtion in Millions", round(`Population 2020 projected`, 2)
+          )
+        )
+      ) |>
+      addLabelOnlyMarkers(
+        data         = centroids3,
+        label        = ~adm1_name,
+        labelOptions = labelOptions(
+          noHide    = TRUE,
+          direction = "center",
+          style     = list(
+            "font-weight" = "bold",
+            "color"       = "black",
+            "font-size"   = "9px",
+            "padding"     = "2px"
+          )
+        )
+      ) |>
+      addLegend(
+        pal      = pal,
+        values   = ~`Population 2020 projected`[!is.na(`Population 2020 projected`)],
+        title    = "Population in Millions",
+        position = "bottomright"
+      ) |>
+      addControl("No data = grey states", position = "bottomright")
+  }
+  
 })
 ```
