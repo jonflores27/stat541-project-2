@@ -23,6 +23,7 @@ server: shiny
 ```{r}
 #| label: Libraries
 #| message: false
+#| context: setup
 
 library(tidyverse)
 library(gt)
@@ -85,6 +86,32 @@ plot_this2 <- my_shapefile |>
 
 
 centroids <- st_centroid(plot_this)
+
+
+
+first_nonmissing <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) NA else x[1]
+}
+model_df <- final_merged |>
+  group_by(country, year) |>
+  summarise(
+    total_plastic = sum(total, na.rm = TRUE),
+    Population_millions = first_nonmissing(Population) / 1000000,
+    pop_density = first_nonmissing(pop_density),
+    gdp_billions = first_nonmissing(gdp) / 1000000000,
+    region = first_nonmissing(region),
+    .groups = "drop"
+  ) |>
+  mutate(
+    country = factor(country),
+    year = factor(year),
+    region = factor(region),
+    log_total_plastic = log(total_plastic),
+    log_population = log(Population_millions),
+    log_pop_density = log(pop_density),
+    log_gdp_billions = log(gdp_billions)
+  ) 
 ```
 
 
@@ -235,6 +262,8 @@ the_7 <- final_merged |>
 ```
 
 ```{r}
+
+
 #COPY THIS TABLE FOR CHANGE
 
 countries <- unique(the_7$country)
@@ -270,7 +299,7 @@ buttons <- lapply(seq_along(countries), function(i) {
                    list(title = paste(
                      "Top 7 Plastic Waste Producing Companies in", 
                      countries[i]),
-                     yaxis = list(title = "Parent Company"),
+                     yaxis = list(title = ""),
                      xaxis = list(title = "Total Plastic Audited",
                                   autorange = TRUE))),
        label = countries[i])
@@ -282,14 +311,14 @@ fig <- fig |>
                                  active = 0,
                                  buttons = buttons,
                                  x = 0,
-                                 y = 1.25,
+                                 y = 1.30,
                                  xanchor = "left",
                                  yanchor = "top",
                                  pad = list(r = 10, t = 10))),
          title = list(text = paste("Top 7 Plastic Waste Producing Companies in",
                                    countries[1]),
-                      y = .85),
-         yaxis = list(title = "Parent Company"),
+                      y = .93),
+         yaxis = list(title = ""),
          xaxis = list(title = "Total Plastic Audited", autorange = TRUE),
          showlegend = FALSE)
 
@@ -423,78 +452,91 @@ final_merged |>
 :::
 
 #### Row {height="40%"}
-
 ```{r}
-#| label: Data Model Output1
-#| warning: false
+#| label: Data Model
+#| include: false
 
+
+first_nonmissing <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) NA else x[1]
+}
 model_df <- final_merged |>
   group_by(country, year) |>
   summarise(
     total_plastic = sum(total, na.rm = TRUE),
-    Population_millions = first(na.omit(Population)) / 1000000,
-    pop_density = first(na.omit(pop_density)),
-    gdp_billions = first(na.omit(gdp)) / 1000000000,
-    region = first(na.omit(region)),
+    Population_millions = first_nonmissing(Population) / 1000000,
+    pop_density = first_nonmissing(pop_density),
+    gdp_billions = first_nonmissing(gdp) / 1000000000,
+    region = first_nonmissing(region),
     .groups = "drop"
   ) |>
   mutate(
-    region = as.factor(region),
-    log_total_plastic = log(total_plastic)
+    country = factor(country),
+    year = factor(year),
+    region = factor(region),
+    log_total_plastic = log(total_plastic),
+    log_population = log(Population_millions),
+    log_pop_density = log(pop_density),
+    log_gdp_billions = log(gdp_billions)
   ) 
 
-fit_6 <- lm(
-  log_total_plastic ~ Population_millions + pop_density + gdp_billions + region,
-  model_df
-)
-
-tbl <- tidy(fit_6, conf.int = TRUE) |>
-  mutate(
-    Predictor = dplyr::recode(term,
-      `(Intercept)` = "Intercept",
-      `Population_millions` = "Population (millions)",
-      `pop_density` = "Population Density",
-      `gdp_billions` = "GDP (billions)"
-    ),
-    Predictor = sub("^region", "Region: ", Predictor)
-  ) |>
-  dplyr::select(
-    Predictor,
-    Estimate = estimate,
-    `Std. Error` = std.error,
-    `t value` = statistic,
-    `p value` = p.value,
-    `95% CI Lower` = conf.low,
-    `95% CI Upper` = conf.high
-  )
-
-tbl |>
-  gt() |>
-  tab_header(
-    title = md("**Linear Regression Predicting Logged Plastic Collected by Country, Year**"),
-    subtitle = "Response: log(total_plastic)"
-  ) |>
-  cols_label(
-    Predictor = md("**Predictor**"),
-    Estimate = md("**Estimate**"),
-    `Std. Error` = md("**Std. Error**"),
-    `t value` = md("**t value**"),
-    `p value` = md("**p value**"),
-    `95% CI Lower` = md("**95% CI Lower**"),
-    `95% CI Upper` = md("**95% CI Upper**")
-  ) |>
-  fmt_number(
-    columns = c(Estimate, `Std. Error`, `t value`, `95% CI Lower`, `95% CI Upper`),
-    decimals = 4
-  ) |>
-  fmt_number(columns = `p value`, decimals = 3) |>
-  tab_source_note(
-    source_note = md(
-       "The response variable was transformed as log(total_plastic) to meet linear regression assumptions"
-    )
-  )
 ```
 
+```{r}
+#| label: Data Model Output
+#| warning: false
+
+library(tidyverse)
+library(gt)
+library(lme4)
+library(lmerTest)
+library(broom.mixed)
+fit_final_maybe <- lmer(
+  log_total_plastic ~
+    log_population +
+    log_pop_density +
+    log_gdp_billions +
+    year +
+    region +
+    (1 | country),
+  data = model_df,
+  REML = TRUE
+)
+
+anova(fit_final_maybe) |>
+  as.data.frame() |>
+  tibble::rownames_to_column("Predictor") |>
+  mutate(
+    Predictor = dplyr::recode(
+      Predictor,
+      log_population = "Log Population",
+      log_pop_density = "Log Population Density",
+      log_gdp_billions = "Log GDP (billions)",
+      year = "Year",
+      region = "Region"
+    )
+  ) |>
+  gt() |>
+  tab_header(
+    title = md("**Type III ANOVA for Final Mixed Model**"),
+    subtitle = "Satterthwaite's method"
+  ) |>
+  fmt_number(
+    columns = where(is.numeric),
+    decimals = 3
+  ) |>
+  tab_style(
+    style = list(
+      cell_text(weight = "bold")
+    ),
+    locations = cells_body(
+      rows = Predictor == "Log Population"
+    )
+  )
+
+
+```
 
 
 
@@ -513,7 +555,7 @@ Nigeria ranks among the highest contributors to plastic waste in our dataset whe
 ## Row - Plot of Nigeria {height="75%"}
 
 
-### Column {width="25%"}
+### Column {width="20%"}
 
 ```{r}
 selectInput(
@@ -527,7 +569,7 @@ selectInput(
 )
 ```
 
-### Column {width="75%"}
+### Column {width="80%"}
 
 ```{r}
 leafletOutput("map", height = "500px")
@@ -636,94 +678,4 @@ output$map <- renderLeaflet({
       addControl("No data = grey states", position = "bottomright")
   }
 })
-```
-
-
-```{r}
-#| warning: false
-#| eval: false
-#| include: false
-
-library(sf)
-library(tidyverse)
-library(leaflet)
-
-my_shapefile <- st_read("nga_admin1.geojson", quiet = TRUE)
-nigera <- read_csv("data.csv")
-
-nigera_clean <- nigera |>
-  filter(State != "TOTAL") |>
-  mutate(
-    State = case_when(
-      State == "Abuja" ~ "Federal Capital Territory",
-      State == "Akwa-Ibom" ~ "Akwa Ibom",
-      State == "Cross-river" ~ "Cross River",
-      State == "Bayesa" ~ "Bayelsa",
-      TRUE ~ State
-    )
-  )
-
-plot_this <- my_shapefile |>
-  left_join(nigera_clean, by = c("adm1_name" = "State")) |>
-  mutate(
-    plastic_kg_per_person_year = (Ty / Population) / 11 * 1000
-  )
-
-centroids <- st_centroid(plot_this)
-
-pal <- colorBin(
-  palette = "Blues",
-  domain = plot_this$plastic_kg_per_person_year,
-  bins = c(0, 25, 50, 75, 100, 150, 250),
-  na.color = "grey80"
-)
-
-leaflet(plot_this) |>
-  addProviderTiles(providers$CartoDB.PositronNoLabels) |>
-  addPolygons(
-    fillColor = ~pal(plastic_kg_per_person_year),
-    fillOpacity = 0.8,
-    color = "black",
-    weight = 1,
-    popup = ~ifelse(
-      is.na(plastic_kg_per_person_year),
-      paste0("<b>", adm1_name, "</b><br>No data available"),
-      paste0(
-        "<b>", adm1_name, "</b>",
-        "<br>Total plastic (Ty): ", round(Ty, 0),
-        "<br>Population: ", Population,
-        "<br>Plastic per person: ",
-        round(plastic_kg_per_person_year, 2), " kg/year"
-      )
-    )
-  ) |>
-  addLabelOnlyMarkers(
-    data = centroids,
-    label = ~adm1_name,
-    labelOptions = labelOptions(
-      noHide = TRUE,
-      direction = "center",
-      style = list(
-        "font-weight" = "bold",
-        "color" = "black",
-        "font-size" = "9px",
-        "padding" = "2px"
-      )
-    )
-  ) |>
-  addLegend(
-    pal = pal,
-    values =  ~plastic_kg_per_person_year[!is.na(plastic_kg_per_person_year)],
-    title = "Plastic waste (kg per person per year)",
-    position = "bottomright"
-  ) |>
-  addControl(
-    "No data = grey states",
-    position = "bottomright"
-  ) |>
-  addControl(
-    "Data available for 28 states (2007–2017)",
-    position = "topright"
-  )
-
 ```
