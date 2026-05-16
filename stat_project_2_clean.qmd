@@ -15,6 +15,7 @@ execute:
   echo: false
   warning: false
   message: false
+server: shiny
 ---
 
 # The World
@@ -38,6 +39,10 @@ library(scales)
 library(car)
 library(plotly)
 library(MASS)
+library(shiny)
+library(sf)
+library(leaflet)
+
 
 plastics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2021/2021-01-26/plastics.csv')
 
@@ -46,6 +51,40 @@ plastics_clean <- plastics |>
          total = rowSums(across(c(empty:pvc))),
          .before = num_events)
 final_merged <- readRDS("full_table")
+
+state_gdp <- read_csv("nigeria_state_gdp.csv")
+
+state_gdp_clean <- state_gdp |>
+  mutate(State = str_remove(State, " State"))
+
+
+my_shapefile <- st_read("nga_admin1.geojson", quiet = TRUE)
+nigeria      <- read_csv("data.csv")
+gdp_data     <- read_csv("nigeria_state_gdp.csv")
+
+nigeria_clean <- nigeria |>
+  filter(State != "TOTAL") |>
+  mutate(
+    State = case_when(
+      State == "Abuja"        ~ "Federal Capital Territory",
+      State == "Akwa-Ibom"   ~ "Akwa Ibom",
+      State == "Cross-river" ~ "Cross River",
+      State == "Bayesa"      ~ "Bayelsa",
+      TRUE ~ State
+    )
+  )
+
+plot_this <- my_shapefile |>
+  left_join(nigeria_clean, by = c("adm1_name" = "State")) |>
+  mutate(plastic_kg_per_person_year = (Ty / Population) / 11 * 1000)
+
+
+plot_this2 <- my_shapefile |>
+  left_join(state_gdp_clean, by = join_by(adm1_name == State)) |>
+  mutate(gdp_bil_usd = `GDP (bil. US$)`)
+
+
+centroids <- st_centroid(plot_this)
 ```
 
 
@@ -62,9 +101,10 @@ How are demographic, economic, and geographic characteristics of countries assoc
 
 ### Column {width="45%"}
 
-#### Row {height="60%}
+#### Row {height="60%"}
 ::: panel-tabset
 ## GDP vs Plastic Pollution
+::: {.card title="The Big Picture"}
 GDP is the one of the most popular measures of a country's economic health. In this plot, we can see how that surface level measurement relates to the plastic audited by region throught the world.
 
 ```{r}
@@ -113,8 +153,10 @@ final_merged |>
 ))
 
 ```
+:::
 
-## GDP per Capita Groups
+## GDP vs Plastic Types
+::: {.card title="Platic Types by GDP Categories"}
 The plastic audited in a country can be affected by the country's economic health. This plot differentiates this health by the GDP per Capita metric. Once again often used to denote economic health.
 ```{r}
 #| label: Vizualization-3
@@ -167,11 +209,11 @@ final_merged |>
         legend.position = "none") 
 
 ```
+:::
 
 
-
-## Bars
-
+## Waste Producers
+::: {.card title="Economic Drivers = Plastic Waste Generators???"}
 The presence of large corporations withing a country may also affect the plastic produced. This talbe explores which companies produce the most plastic waste that was audited within a country.
 
 ```{r}
@@ -256,7 +298,7 @@ fig
 # Ik it comes out overlapping here but its fine when it renders.
 ```
 
-
+:::
 :::
 
 
@@ -468,10 +510,139 @@ Nigeria ranks among the highest contributors to plastic waste in our dataset whe
 
 :::
 
-## Row - Plot of Nigeria
+## Row - Plot of Nigeria {height="75%"}
+
+
+### Column {width="25%"}
+
+```{r}
+selectInput(
+  "metric",
+  "Select metric to display:",
+  choices = c(
+    "Plastic waste (kg/person/year)" = "plastic",
+    "GDP (billion US$)"              = "gdp"
+  ),
+  selected = "plastic"
+)
+```
+
+### Column {width="75%"}
+
+```{r}
+leafletOutput("map", height = "500px")
+```
+
+```{r}
+#| context: server
+
+output$map <- renderLeaflet({
+
+  if (input$metric == "plastic") {
+
+    pal <- colorBin(
+      palette  = "Blues",
+      domain   = plot_this$plastic_kg_per_person_year,
+      bins     = c(0, 25, 50, 75, 100, 150, 250),
+      na.color = "grey80"
+    )
+
+    leaflet(plot_this) |>
+      addProviderTiles(providers$CartoDB.PositronNoLabels) |>
+      addPolygons(
+        fillColor   = ~pal(plastic_kg_per_person_year),
+        fillOpacity = 0.8,
+        color       = "black",
+        weight      = 1,
+        popup = ~ifelse(
+          is.na(plastic_kg_per_person_year),
+          paste0("<b>", adm1_name, "</b><br>No data available"),
+          paste0(
+            "<b>", adm1_name, "</b>",
+            "<br>Total plastic (Ty): ", round(Ty, 0),
+            "<br>Population: ", Population,
+            "<br>Plastic per person: ", round(plastic_kg_per_person_year, 2), " kg/year"
+          )
+        )
+      ) |>
+      addLabelOnlyMarkers(
+        data         = centroids,
+        label        = ~adm1_name,
+        labelOptions = labelOptions(
+          noHide    = TRUE,
+          direction = "center",
+          style     = list(
+            "font-weight" = "bold",
+            "color"       = "black",
+            "font-size"   = "9px",
+            "padding"     = "2px"
+          )
+        )
+      ) |>
+      addLegend(
+        pal      = pal,
+        values   = ~plastic_kg_per_person_year[!is.na(plastic_kg_per_person_year)],
+        title    = "Plastic waste (kg per person per year)",
+        position = "bottomright"
+      ) |>
+      addControl("No data = grey states",               position = "bottomright") |>
+      addControl("Data available for 28 states (2007–2017)", position = "topright")
+
+  } else if (input$metric == "gdp") {
+
+    pal <- colorBin(
+      palette  = "Greens",
+      domain   = plot_this$gdp_bil_usd,
+      bins     = c(0, 5, 10, 20, 40, 75, 110),
+      na.color = "grey80"
+    )
+
+    leaflet(plot_this2) |>
+      addProviderTiles(providers$CartoDB.PositronNoLabels) |>
+      addPolygons(
+        fillColor   = ~pal(gdp_bil_usd),
+        fillOpacity = 0.8,
+        color       = "black",
+        weight      = 1,
+        popup = ~ifelse(
+          is.na(gdp_bil_usd),
+          paste0("<b>", adm1_name, "</b><br>No data available"),
+          paste0(
+            "<b>", adm1_name, "</b>",
+            "<br>GDP: $", round(gdp_bil_usd, 2), " billion USD"
+          )
+        )
+      ) |>
+      addLabelOnlyMarkers(
+        data         = centroids,
+        label        = ~adm1_name,
+        labelOptions = labelOptions(
+          noHide    = TRUE,
+          direction = "center",
+          style     = list(
+            "font-weight" = "bold",
+            "color"       = "black",
+            "font-size"   = "9px",
+            "padding"     = "2px"
+          )
+        )
+      ) |>
+      addLegend(
+        pal      = pal,
+        values   = ~gdp_bil_usd[!is.na(gdp_bil_usd)],
+        title    = "GDP (billion $US)",
+        position = "bottomright"
+      ) |>
+      addControl("No data = grey states", position = "bottomright")
+  }
+})
+```
+
 
 ```{r}
 #| warning: false
+#| eval: false
+#| include: false
 
 library(sf)
 library(tidyverse)
