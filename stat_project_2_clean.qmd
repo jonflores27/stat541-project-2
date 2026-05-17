@@ -43,6 +43,9 @@ library(MASS)
 library(shiny)
 library(sf)
 library(leaflet)
+library(lme4)
+library(lmerTest)
+library(broom.mixed)
 
 
 plastics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2021/2021-01-26/plastics.csv')
@@ -142,7 +145,7 @@ How are demographic, economic, and geographic characteristics of countries assoc
 
 ## Row {height="90%"}
 
-### Column {width="40%"}
+### Column {width="60%"}
 
 #### Row {height="45%"}
 ::: panel-tabset
@@ -327,7 +330,7 @@ fig <- fig |>
                                  active = 0,
                                  buttons = buttons,
                                  x = 0,
-                                 y = 1.30,
+                                 y = 1.25,
                                  xanchor = "left",
                                  yanchor = "top",
                                  pad = list(r = 10, t = 10))),
@@ -344,17 +347,9 @@ fig
 ```
 
 :::
-:::
-
-
-
-
-### Column - Model {width="55%"}
-#### Row {height="55%"}
-
-::: panel-tabset
 
 ## Environmental Metrics
+::: {.card title="Environmental Metrics for 5 Most Populated Countries"}
 
 ```{r}
 #| label: Table Reserch Question 2
@@ -402,117 +397,24 @@ final_merged |>
   )
 ```
 
-## Employment Sectors
-
-```{r}
-
-#| label: tbl-Research question 2 table 2
-#| tbl-cap: "Percent of Plastic Types Compared to Largest Indurtry Sectors for the 5 Most Populated Countries"
-
-rate_ify2 <- function(df, numerators, denominator) {
-  stopifnot(is.data.frame(df))
-  
-  df |>
-    mutate(across(.cols = {{ numerators }},
-                  .fns = ~ .x / {{ denominator }},
-                  .names = "{.col}"))
-}
-
-final_merged |> 
-  group_by(country) |> 
-  summarise(hdpe = sum(hdpe),
-            ldpe = sum(ldpe),
-            o = sum(o),
-            pet = sum(pet),
-            pp = sum(pp),
-            ps = sum(ps),
-            pvc = sum(pvc),
-            total_waste = sum(total),
-            industry = mean(employment_industry),
-            service = mean(employment_services),
-            ag = mean(employment_agriculture),
-            .groups = "drop") |>
-  filter(country %in% c("India",
-                        "China",
-                        "United States of America",
-                        "Indonesia", 
-                        "Nigeria")) |>
-  rate_ify2(numerator = hdpe:pvc,
-           denominator = total_waste) |> 
-
-  gt() |> 
-  tab_header(
-    title = "Proportions of Plastic Types Compared to Employment Sectorization",
-    subtitle = "Data from 2019 and 2020 Featuring the 5 Most Populated Countries") |> 
-  fmt_percent(
-    columns = hdpe:pvc,
-    decimals = 2) |> 
-  tab_style(style = cell_text(weight = "bold"),
-            locations = cells_column_labels()) |>
-  cols_label(country = "Country",
-             o = "Other",
-             total_waste = "Total Count of Plastics",
-             industry = "Percent of Employment in Industry Sector",
-             service = "Percent of Employment in Service Sector",
-             ag = "Percent of Employment in Agriculture Sector") |> 
-  data_color(columns = hdpe:pvc,
-             direction = "row",
-             palette = "PuBu"
-             ) |> 
-  data_color(columns = industry: ag,
-             direction = "row",
-             palette = "PuBu"
-             )
-```
+:::
 
 :::
 
-#### Row {height="50%"}
-::: {.card}
-::: {style="font-size: 10px;"}
-The model suggests that log population was the only significant predictor \{b = 0.928, SE = 0.408, t = 2.272, p = 0.028, with a 95% CI [0.106, 1.750]\} of logged plastic collected after accounting for country level differences rather than GDP, population density, year, or region.
+
+
+### Column - Model {width="40%"}
+
+::: {.card title="Our Model"}
+
+This mixed effects model examines how population, population density, GDP, year, and geographic region are associated with the amount of plastic collected in cleanup audits. The response variable is the logged total number of plastic items collected for each country/year.
+
+Population, population density, and GDP are also log transformed so the model is more stable rather than the raw units. Region and year are included as fixed effects, while country is included as a random effect to account for repeated observations from the same country across years.
+
+Only log population is statistically significant in the mixed model, suggesting that countries with larger populations tend to have higher audited plastic totals, while population density, GDP, year, and region do not show significant associations after accounting for country level variation.
+
 :::
-
 ```{r}
-#| label: Data Model
-#| include: false
-
-
-first_nonmissing <- function(x) {
-  x <- x[!is.na(x)]
-  if (length(x) == 0) NA else x[1]
-}
-model_df <- final_merged |>
-  group_by(country, year) |>
-  summarise(
-    total_plastic = sum(total, na.rm = TRUE),
-    Population_millions = first_nonmissing(Population) / 1000000,
-    pop_density = first_nonmissing(pop_density),
-    gdp_billions = first_nonmissing(gdp) / 1000000000,
-    region = first_nonmissing(region),
-    .groups = "drop"
-  ) |>
-  mutate(
-    country = factor(country),
-    year = factor(year),
-    region = factor(region),
-    log_total_plastic = log(total_plastic),
-    log_population = log(Population_millions),
-    log_pop_density = log(pop_density),
-    log_gdp_billions = log(gdp_billions)
-  ) 
-
-```
-
-```{r}
-#| label: Data Model Output
-#| warning: false
-
-library(tidyverse)
-library(gt)
-library(lme4)
-library(lmerTest)
-library(broom.mixed)
 fit_final_maybe <- lmer(
   log_total_plastic ~
     log_population +
@@ -555,11 +457,11 @@ anova(fit_final_maybe) |>
       rows = Predictor == "Log Population"
     )
   )
-
-
 ```
 
-:::
+
+
+
 
 
 # Nigeria
